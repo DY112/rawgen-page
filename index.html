@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon-1-viewfinder-r.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>RawGen: Learning Camera Raw Image Generation</title>
+<meta name="description" content="RawGen: First diffusion-based framework for text-to-raw and sRGB-to-raw camera raw image generation.">
+<meta property="og:title" content="RawGen: Learning Camera Raw Image Generation">
+<meta property="og:description" content="First diffusion-based framework for text-to-raw and sRGB-to-raw camera raw image generation.">
+<meta property="og:image" content="https://dy112.github.io/rawgen-page/assets/images/teaser/capture-raw.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://dy112.github.io/rawgen-page/assets/images/teaser/capture-raw.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+/* ════════════════════════════════════════════════════════════
+   DESIGN SYSTEM: "THE DIGITAL VIEWFINDER"
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Dark Theme (default + explicit) ── */
+:root, [data-theme="dark"] {
+  --surface-dim: #121416;
+  --surface: #121416;
+  --surface-lo: #1a1c1e;
+  --surface-mid: #1e2022;
+  --surface-hi: #282a2c;
+  --surface-top: #333537;
+  --primary: #c3f5ff;
+  --primary-ctr: #00e5ff;
+  --on-primary: #00363d;
+  --secondary: #b4cad6;
+  --tertiary: #ffeac0;
+  --on-surface: #e2e2e5;
+  --on-surface-var: #bac9cc;
+  --outline: #849396;
+  --outline-var: #3b494c;
+  --error: #ff6464;
+  --ok: #50c878;
+  --ghost: rgba(59,73,76,.15);
+  --nav-bg: rgba(18,20,22,.70);
+  --glass-bg: rgba(30,32,34,.70);
+  --glass-brd: rgba(195,245,255,.08);
+  --glow: rgba(0,229,255,.06);
+  --glow-strong: rgba(0,229,255,.15);
+  --grain: .025;
+  --bracket-c: #00e5ff;
+  --best-bg: rgba(0,229,255,.06);
+}
+
+/* ── Light Theme ── */
+[data-theme="light"] {
+  --surface-dim: #f4f5f7;
+  --surface: #f8f9fb;
+  --surface-lo: #edeef2;
+  --surface-mid: #e4e6ea;
+  --surface-hi: #d8dbe0;
+  --surface-top: #cdd0d6;
+  --primary: #005f6a;
+  --primary-ctr: #007a88;
+  --on-primary: #ffffff;
+  --secondary: #4a5c66;
+  --tertiary: #6d5800;
+  --on-surface: #1a1c1e;
+  --on-surface-var: #40484c;
+  --outline: #6f797c;
+  --outline-var: #c0cacd;
+  --error: #ba1a1a;
+  --ok: #2e7d32;
+  --ghost: rgba(192,202,205,.25);
+  --nav-bg: rgba(248,249,251,.85);
+  --glass-bg: rgba(237,238,242,.80);
+  --glass-brd: rgba(0,95,106,.10);
+  --glow: rgba(0,122,136,.04);
+  --glow-strong: rgba(0,122,136,.08);
+  --grain: .012;
+  --bracket-c: #007a88;
+  --best-bg: rgba(0,122,136,.06);
+}
+
+/* System preference fallback (before JS sets data-theme) */
+@media(prefers-color-scheme:light){
+  html:not([data-theme]){
+    --surface-dim:#f4f5f7;--surface:#f8f9fb;--surface-lo:#edeef2;--surface-mid:#e4e6ea;--surface-hi:#d8dbe0;--surface-top:#cdd0d6;--primary:#005f6a;--primary-ctr:#007a88;--on-primary:#fff;--secondary:#4a5c66;--tertiary:#6d5800;--on-surface:#1a1c1e;--on-surface-var:#40484c;--outline:#6f797c;--outline-var:#c0cacd;--error:#ba1a1a;--ok:#2e7d32;--ghost:rgba(192,202,205,.25);--nav-bg:rgba(248,249,251,.85);--glass-bg:rgba(237,238,242,.80);--glass-brd:rgba(0,95,106,.10);--glow:rgba(0,122,136,.04);--glow-strong:rgba(0,122,136,.08);--grain:.012;--bracket-c:#007a88;--best-bg:rgba(0,122,136,.06);
+  }
+}
+
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:calc(64px + env(safe-area-inset-top))}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--surface-dim);
+  color:var(--on-surface);
+  line-height:1.7;
+  overflow-x:hidden;
+  transition:background .4s,color .4s;
+}
+img{max-width:100%;display:block}
+a{color:var(--primary);text-decoration:none}
+::selection{background:var(--primary-ctr);color:var(--on-primary)}
+
+/* ── Font classes ── */
+.f-head{font-family:'Sora',sans-serif}
+.f-body{font-family:'Inter',system-ui,sans-serif}
+.f-label{font-family:'Space Grotesk',monospace;text-transform:uppercase;letter-spacing:.12em}
+.f-label-sm{font-family:'Space Grotesk',monospace;text-transform:uppercase;letter-spacing:.18em;font-size:.65rem}
+
+/* ════════════════════════════════════════════════════════════
+   NAV — Glassmorphism
+   ════════════════════════════════════════════════════════════ */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  background:rgba(255,255,255,.08);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(255,255,255,.1);
+  box-shadow:
+    0 4px 24px rgba(0,0,0,.06),
+    inset 0 1px 0 rgba(255,255,255,.15),
+    inset 0 -1px 0 rgba(255,255,255,.04),
+    inset 0 0 12px 4px rgba(255,255,255,.03);
+  transition:background .4s,border .4s,box-shadow .4s;
+  padding-top:env(safe-area-inset-top);
+}
+.nav::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+}
+[data-theme="light"] .nav{
+  background:rgba(255,255,255,.45);
+  border-bottom:1px solid rgba(255,255,255,.5);
+  box-shadow:
+    0 4px 24px rgba(0,0,0,.04),
+    inset 0 1px 0 rgba(255,255,255,.7),
+    inset 0 -1px 0 rgba(255,255,255,.2),
+    inset 0 0 12px 4px rgba(255,255,255,.4);
+}
+[data-theme="light"] .nav::before{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);
+}
+.nav-in{max-width:1200px;margin:0 auto;padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Sora',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;color:var(--primary-ctr);text-decoration:none}
+.nav-r{display:flex;align-items:center;gap:4px}
+.nav-r a{color:var(--secondary);font-family:'Space Grotesk',monospace;font-size:.65rem;letter-spacing:.16em;text-transform:uppercase;padding:6px 12px;transition:color .2s;text-decoration:none}
+.nav-r a:hover,.nav-r a.on{color:var(--primary)}
+.thm{background:none;border:none;color:var(--secondary);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;transition:all .2s;margin-left:6px}
+.thm:hover{color:var(--primary)}
+.ham{display:none;background:none;border:none;cursor:pointer;width:34px;height:34px;position:relative;padding:0}
+.ham-line{position:absolute;left:7px;width:20px;height:1.5px;background:var(--on-surface);transition:transform .35s cubic-bezier(.77,.2,.05,1),opacity .25s ease,top .35s cubic-bezier(.77,.2,.05,1)}
+.ham-line:nth-child(1){top:10px}
+.ham-line:nth-child(2){top:16px}
+.ham-line:nth-child(3){top:22px}
+.ham.open .ham-line:nth-child(1){top:16px;transform:rotate(45deg)}
+.ham.open .ham-line:nth-child(2){opacity:0}
+.ham.open .ham-line:nth-child(3){top:16px;transform:rotate(-45deg)}
+@media(max-width:800px){
+  .nav-r .desk{display:none}.ham{display:block}
+  .nav-r.open .desk{display:flex;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:var(--surface-dim);border-bottom:1px solid var(--ghost);box-shadow:0 8px 32px rgba(0,0,0,.3);padding:8px 28px}
+  .nav-r.open .desk a{padding:10px 12px}
+}
+
+/* ════════════════════════════════════════════════════════════
+   VIEWFINDER BRACKET SYSTEM
+   ════════════════════════════════════════════════════════════ */
+.vf{position:relative}
+.vf-b{position:absolute;width:12px;height:12px;border-color:var(--bracket-c);z-index:5;pointer-events:none}
+.vf-tl{top:0;left:0;border-top:2px solid;border-left:2px solid}
+.vf-tr{top:0;right:0;border-top:2px solid;border-right:2px solid}
+.vf-bl{bottom:0;left:0;border-bottom:2px solid;border-left:2px solid}
+.vf-br{bottom:0;right:0;border-bottom:2px solid;border-right:2px solid}
+
+/* Padded brackets */
+.vf-p .vf-b{margin:6px}
+
+/* Glass panel */
+.glass{background:var(--glass-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-brd)}
+
+/* ════════════════════════════════════════════════════════════
+   LAYOUT
+   ════════════════════════════════════════════════════════════ */
+.wn{max-width:860px;margin:0 auto;padding:0 28px}
+.wm{max-width:1080px;margin:0 auto;padding:0 28px}
+.ww{max-width:1320px;margin:0 auto;padding:0 28px}
+.sec{padding:100px 0;overflow-x:hidden}
+
+/* Section separators: background shift, not lines */
+.sec-alt{background:var(--surface-lo)}
+
+/* ════════════════════════════════════════════════════════════
+   HERO
+   ════════════════════════════════════════════════════════════ */
+.hero{padding:calc(130px + env(safe-area-inset-top)) 0 48px;text-align:center;position:relative;overflow:hidden}
+
+/* Viewfinder background container */
+.hero-vf{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:720px;height:720px;pointer-events:none;z-index:0;
+}
+/* Outer ring */
+.hero-vf::before{
+  content:'';position:absolute;inset:0;
+  border:1px solid var(--outline-var);border-radius:50%;
+  opacity:.12;
+}
+/* Inner ring */
+.hero-vf::after{
+  content:'';position:absolute;inset:80px;
+  border:1px solid var(--primary-ctr);border-radius:50%;
+  opacity:.10;
+}
+/* Crosshair lines */
+.hero-cross-h,.hero-cross-v{position:absolute;background:var(--primary-ctr);opacity:.06}
+.hero-cross-h{top:50%;left:0;right:0;height:1px;transform:translateY(-50%)}
+.hero-cross-v{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%)}
+/* Tick marks on crosshair */
+.hero-ticks{position:absolute;inset:0}
+.hero-ticks span{
+  position:absolute;width:1px;height:10px;background:var(--primary-ctr);opacity:.12;
+  left:50%;transform:translateX(-50%);
+}
+.hero-ticks span:nth-child(1){top:calc(50% - 200px)}
+.hero-ticks span:nth-child(2){top:calc(50% + 200px - 10px)}
+.hero-ticks span:nth-child(3){top:50%;left:calc(50% - 200px);transform:translateY(-50%) rotate(90deg)}
+.hero-ticks span:nth-child(4){top:50%;left:calc(50% + 200px);transform:translateY(-50%) rotate(90deg)}
+/* Center reticle */
+.hero-reticle{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:24px;height:24px;opacity:.08;
+}
+.hero-reticle::before,.hero-reticle::after{
+  content:'';position:absolute;background:var(--primary-ctr);
+}
+.hero-reticle::before{top:0;left:50%;width:1px;height:100%;transform:translateX(-50%)}
+.hero-reticle::after{top:50%;left:0;width:100%;height:1px;transform:translateY(-50%)}
+/* Radial glow behind title */
+.hero-glow{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-48%);
+  width:500px;height:400px;
+  background:radial-gradient(ellipse,var(--glow-strong) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+/* Corner focus brackets on hero */
+.hero-corners{position:absolute;inset:24px;pointer-events:none;z-index:0}
+.hero-corners .vf-b{border-color:var(--primary-ctr);opacity:.10;width:20px;height:20px}
+
+.hero .wn{position:relative;z-index:2}
+.osd-bl,.osd-br{z-index:2}
+.hero-badge{display:inline-flex;gap:6px;padding:4px 14px;background:var(--glow);border:1px solid var(--glass-brd);font-family:'Space Grotesk',monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);margin-bottom:28px}
+.hero h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(3rem,7vw,5.5rem);line-height:1.05;letter-spacing:-.03em;margin-bottom:20px}
+.hero h1 em{font-style:normal;font-weight:700;color:var(--primary-ctr)}
+.hero-sub{font-size:1.1rem;color:var(--secondary);max-width:580px;margin:0 auto 10px;line-height:1.72}
+.hero-sub strong{color:var(--primary);font-weight:600}
+.authors{font-size:.9rem;color:var(--secondary);margin-bottom:4px}
+.authors a{color:var(--secondary);text-decoration:none;border-bottom:1px solid transparent;transition:color .2s,border-color .2s}
+.authors a:hover{color:var(--primary);border-bottom-color:var(--primary)}
+.authors .wbr{display:none}
+.authors .nsep{display:inline}
+@media(min-width:768px){.authors .wbr{display:block}.authors .nsep{display:none}}
+.affil{font-size:.8rem;color:var(--outline);margin-bottom:28px}
+.hero-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* Buttons: sharp 0px radius */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 24px;font-family:'Space Grotesk',monospace;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;text-decoration:none;transition:all .25s;cursor:pointer;border:none}
+.btn-p{background:var(--primary-ctr);color:var(--on-primary);box-shadow:0 0 20px var(--glow-strong)}
+.btn-p:hover{box-shadow:0 0 40px var(--glow-strong)}
+.btn-s{background:transparent;color:var(--on-surface);border:1px solid var(--ghost)}
+.btn-s:hover{border-color:var(--primary-ctr);color:var(--primary)}
+
+/* OSD corner labels */
+.osd-bl{position:absolute;bottom:16px;left:28px;font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.14em;color:var(--outline);opacity:.5;text-transform:uppercase;line-height:1.8;z-index:1}
+.osd-br{position:absolute;bottom:16px;right:28px;font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.14em;color:var(--outline);opacity:.5;text-transform:uppercase;line-height:1.8;text-align:right;z-index:1}
+
+/* ════════════════════════════════════════════════════════════
+   COMBINED ABSTRACT + CAPTURE SECTION
+   ════════════════════════════════════════════════════════════ */
+.intro-sec{padding:100px 0}
+.intro-grid{display:grid;grid-template-columns:5fr 7fr;gap:48px;align-items:center}
+@media(max-width:900px){.intro-grid{grid-template-columns:1fr;gap:32px}}
+.intro-left{}
+.intro-left .sl{margin-bottom:6px}
+.intro-left .st{color:var(--tertiary);margin-bottom:16px}
+.intro-abs{font-size:.9rem;line-height:1.85;color:var(--secondary);border-left:3px solid var(--primary-ctr);padding-left:20px;margin-bottom:24px}
+.intro-kw{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+.intro-kw span{font-family:'Space Grotesk',monospace;font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;background:var(--glow);border:1px solid var(--glass-brd);color:var(--primary)}
+.intro-contribs{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.intro-c{display:flex;gap:12px;align-items:flex-start}
+.intro-c-dot{width:6px;height:6px;background:var(--primary-ctr);flex-shrink:0;margin-top:7px}
+.intro-c p{font-size:.84rem;color:var(--secondary);line-height:1.65}
+.intro-c strong{color:var(--on-surface);font-weight:600}
+
+.capture-frame{
+  position:relative;aspect-ratio:4/3;overflow:hidden;
+  background:var(--surface-mid);
+}
+.capture-img{
+  position:absolute;inset:0;width:100%;height:100%;
+}
+.capture-img img{width:100%;height:100%;object-fit:cover}
+.capture-srgb{z-index:2;transition:opacity .7s ease}
+.capture-raw{z-index:1}
+.capture-srgb.captured{opacity:0;transition:opacity 0s}
+/* AF grid */
+.af-grid{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;z-index:5;
+}
+.af-grid-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,5vw,60px)}
+.af-pt{
+  width:12px;height:12px;
+  border:1px solid rgba(255,60,60,1);
+  background:rgba(255,60,60,.2);
+  opacity:0;transition:opacity .04s;
+}
+.af-pt.on{opacity:1}
+/* Status pill */
+.cap-status{
+  position:absolute;top:16px;left:16px;display:flex;align-items:center;gap:8px;z-index:15;
+  padding:4px 12px;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);
+}
+.cap-dot{width:7px;height:7px;border-radius:50%;transition:background .3s}
+.cap-dot-focus{background:var(--error);animation:pulse-dot 1s infinite}
+.cap-dot-done{background:var(--primary-ctr);animation:none}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.cap-text{font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:#fff;transition:color .3s}
+.cap-text-done{color:var(--primary)}
+/* Shutter flash */
+.shutter-flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:20;pointer-events:none}
+@keyframes flash{0%{opacity:0}5%{opacity:1}100%{opacity:0}}
+.shutter-go{animation:flash .5s cubic-bezier(.4,0,.2,1) forwards}
+/* Captured metadata */
+.cap-meta{
+  position:absolute;bottom:16px;right:16px;z-index:15;
+  font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.14em;
+  text-transform:uppercase;color:rgba(255,255,255,.5);text-align:right;
+  line-height:1.8;opacity:0;transition:opacity .5s;
+}
+.cap-meta.vis{opacity:1}
+.cap-sensor{
+  position:absolute;bottom:16px;left:16px;z-index:15;
+  font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.14em;
+  text-transform:uppercase;color:rgba(255,255,255,.5);line-height:1.8;
+}
+.cap-caption{
+  text-align:center;margin-top:12px;
+  font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--outline);
+}
+
+/* ════════════════════════════════════════════════════════════
+   GALLERY (Results Showcase)
+   ════════════════════════════════════════════════════════════ */
+.showcase{padding:40px 0 40px;position:relative;overflow:hidden}
+.sc-lbl{font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:8px}
+.sc-ttl{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(1.8rem,4vw,2.6rem);letter-spacing:-.02em;margin-bottom:8px}
+.sc-desc{font-size:.95rem;color:var(--secondary);max-width:560px;margin-bottom:12px}
+/* Mode toggle */
+.mode-tog{display:flex;background:var(--surface-top);margin-bottom:28px;width:fit-content}
+.mode-b{padding:8px 24px;border:none;background:none;color:var(--secondary);font-family:'Space Grotesk',monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.mode-b.on{background:var(--primary-ctr);color:var(--on-primary)}
+.mode-b:hover:not(.on){color:var(--primary)}
+
+/* Film strip gallery */
+.film-gallery{width:100vw;margin-left:calc(-50vw + 50%);overflow:hidden;padding:8px 0}
+.film-row{overflow:hidden;position:relative;padding:3px 0}
+.film-track{display:flex;gap:6px;width:max-content;animation:filmScroll var(--film-dur,60s) linear infinite}
+.film-row:nth-child(even) .film-track{animation-direction:reverse}
+.film-row:nth-child(1) .film-track{--film-dur:80s}
+.film-row:nth-child(2) .film-track{--film-dur:65s}
+.film-row:nth-child(3) .film-track{--film-dur:75s}
+.film-row:nth-child(4) .film-track{--film-dur:55s}
+#film-t2r .film-row:nth-child(1) .film-track{--film-dur:195s}
+#film-t2r .film-row:nth-child(2) .film-track{--film-dur:160s}
+#film-t2r .film-row:nth-child(3) .film-track{--film-dur:180s}
+.film-track{cursor:grab}
+.film-track:active{cursor:grabbing}
+@keyframes filmScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.film-track{animation-play-state:paused}}
+.film-card{flex-shrink:0;width:300px;height:188px;position:relative;background:var(--surface-mid);overflow:hidden;cursor:pointer;transition:box-shadow .3s,border-color .3s;border:1px solid transparent}
+@media(min-width:900px){.film-card{height:clamp(188px,20vh,288px);width:auto;aspect-ratio:300/188}.film-track{gap:8px}}
+.film-card:hover{box-shadow:0 0 24px var(--glow);border-color:var(--primary-ctr)}
+.film-card img{width:100%;height:100%;object-fit:cover;display:block}
+.film-card .fc-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--outline)}
+.film-card .fc-sensor{position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);font-family:'Space Grotesk',monospace;font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);z-index:2;opacity:0;transition:opacity .25s}
+.film-card:hover .fc-sensor{opacity:1}
+.film-card .fc-prompt{position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(0deg,rgba(0,0,0,.7),transparent);font-size:.65rem;color:rgba(255,255,255,.75);z-index:2;font-style:italic;opacity:0;transition:opacity .25s}
+.film-card:hover .fc-prompt{opacity:1}
+.film-roll-label{font-family:'Space Grotesk',monospace;font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;color:var(--outline);opacity:.5;padding:2px 16px}
+/* Lightbox */
+.film-lb{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;overflow:hidden}
+.film-lb.open{opacity:1;pointer-events:auto}
+.film-lb-wrap{position:relative;max-width:85vw;max-height:85vh;display:flex;flex-direction:column;align-items:center}
+.film-lb-wrap .lb-single{max-width:85vw;max-height:75vh;object-fit:contain;display:block}
+.film-lb-meta{margin-top:12px;text-align:center;font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#00e5ff}
+.film-lb-meta .lb-title{font-family:'Sora',sans-serif;font-size:1rem;text-transform:none;letter-spacing:0;color:#e1e2e6;margin-bottom:4px}
+.film-lb-meta .lb-prompt{font-style:italic;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.65);font-size:.8rem;margin-top:4px}
+.lb-illum-toggle{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.lb-illum-btn{padding:4px 12px;border:1px solid rgba(255,255,255,.3);border-radius:4px;background:transparent;color:rgba(255,255,255,.7);cursor:pointer;font-size:.75rem;font-family:'Space Grotesk',monospace;letter-spacing:.05em;transition:all .2s}
+.lb-illum-btn.on{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.6);color:#fff}
+.lb-illum-btn:hover{border-color:rgba(255,255,255,.5)}
+.film-lb-close{position:absolute;top:-36px;right:0;background:none;border:none;color:rgba(255,255,255,.6);font-size:1.4rem;cursor:pointer;padding:4px 8px;transition:color .2s}
+.film-lb-close:hover{color:#fff}
+.film-lb-img-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+.film-lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.5);font-size:1.6rem;cursor:pointer;padding:12px;transition:color .2s;z-index:2}
+.film-lb-nav:hover{color:#fff}
+.film-lb-prev{left:-60px}
+.film-lb-next{right:-60px}
+.film-lb-counter{font-family:'Space Grotesk',monospace;font-size:.5rem;letter-spacing:.12em;color:var(--outline);margin-top:8px}
+/* Lightbox comparison slider */
+.lb-cmp{position:relative;max-width:85vw;max-height:75vh;cursor:ew-resize;user-select:none;touch-action:none;overflow:hidden}
+.lb-cmp-left,.lb-cmp-right{position:absolute;inset:0}
+.lb-cmp-left{z-index:1;position:relative}
+.lb-cmp-right{z-index:2;clip-path:inset(0 0 0 50%)}
+.lb-cmp-left img{max-width:85vw;max-height:75vh;object-fit:contain;display:block}
+.lb-cmp-right img{width:100%;height:100%;object-fit:contain;display:block}
+.lb-cmp-handle{position:absolute;top:0;bottom:0;left:50%;width:2px;background:rgba(255,255,255,.6);z-index:10;transform:translateX(-50%)}
+.lb-cmp-handle::after{content:'◀ ▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:.55rem;color:rgba(255,255,255,.95);letter-spacing:2px;text-shadow:0 1px 6px rgba(0,0,0,.7);white-space:nowrap}
+.lb-cmp-lbl{position:absolute;bottom:16px;padding:5px 14px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:rgba(255,255,255,.9);font-family:'Space Grotesk',monospace;font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;z-index:12;border-radius:3px;transition:opacity .2s}
+.lb-cmp-lbl-l{left:16px}
+.lb-cmp-lbl-r{right:16px;text-align:right}
+.lb-cmp-sensor{font-size:.6rem;font-weight:400;opacity:.75;letter-spacing:.05em}
+@media(max-width:768px){.lb-cmp-lbl{font-size:.6rem;padding:3px 10px;bottom:10px}.lb-cmp-lbl-l{left:8px}.lb-cmp-lbl-r{right:8px}.lb-cmp-sensor{font-size:.45rem}}
+
+/* ════════════════════════════════════════════════════════════
+   CAMERA SELECTOR
+   ════════════════════════════════════════════════════════════ */
+.cam-sec{background:var(--surface-dim);padding:80px 0 180px}
+.cam-thumbs{display:flex;gap:8px;justify-content:center;margin-bottom:24px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:4px 0}
+.cam-thumbs::-webkit-scrollbar{display:none}
+.cam-thumb{flex-shrink:0;width:64px;height:64px;border-radius:6px;overflow:hidden;border:2px solid transparent;cursor:pointer;opacity:.5;transition:opacity .2s,border-color .2s;background:none;padding:0}
+.cam-thumb.on{opacity:1;border-color:var(--primary)}
+.cam-thumb:hover{opacity:.8}
+.cam-thumb img{width:100%;height:100%;object-fit:cover}
+.cam-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
+@media(min-width:900px){.cam-tabs{max-width:680px;margin-left:auto;margin-right:auto}}
+.cam-tab{font-family:'Space Grotesk',monospace;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--secondary);background:var(--surface-mid);border:1px solid var(--ghost);padding:10px 22px;cursor:pointer;transition:all .2s}
+.cam-tab:hover{border-color:var(--primary-ctr);color:var(--primary)}
+.cam-tab.on{color:var(--primary);background:var(--glow);border-color:var(--primary-ctr)}
+
+/* Camera viewer with arrow nav */
+.cam-viewer{position:relative;overflow:hidden;background:var(--surface-mid);aspect-ratio:1;width:56%;margin:28px auto 0}
+.cam-viewer img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .3s ease}
+.cam-viewer img.cam-behind{z-index:0}
+.cam-viewer img.cam-front{z-index:1}
+.cam-arr{
+  position:absolute;top:0;bottom:0;width:15%;z-index:5;
+  background:none;border:none;cursor:pointer;
+  display:flex;align-items:center;padding:0 16px;
+  color:rgba(255,255,255,.6);transition:color .2s;
+}
+.cam-arr-l{left:0;justify-content:flex-start;background:linear-gradient(90deg,rgba(0,0,0,.3),transparent)}
+.cam-arr-r{right:0;justify-content:flex-end;background:linear-gradient(-90deg,rgba(0,0,0,.3),transparent)}
+.cam-arr:hover{color:rgba(255,255,255,1)}
+.cam-arr svg{width:20px;height:20px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
+.cam-counter{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;
+  font-family:'Space Grotesk',monospace;font-size:.55rem;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(255,255,255,.5);
+  padding:3px 10px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);
+}
+
+/* ════════════════════════════════════════════════════════════
+   COMPARISON SLIDER
+   ════════════════════════════════════════════════════════════ */
+.cmp-s{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;cursor:ew-resize;background:var(--surface-mid);user-select:none;touch-action:none}
+.cmp-l{position:absolute;inset:0}.cmp-b{z-index:1}.cmp-a{z-index:2;clip-path:inset(0 0 0 50%)}
+.cmp-v{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);font-size:.85rem}
+.cmp-lb{position:absolute;bottom:14px;padding:4px 12px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);color:#fff;font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;z-index:5}
+.cmp-ll{left:14px}.cmp-lr{right:14px}
+.cmp-h{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--primary-ctr);z-index:10;transform:translateX(-50%);box-shadow:0 0 16px var(--glow-strong)}
+.cmp-h::after{content:'⟨ ⟩';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;background:var(--primary-ctr);display:flex;align-items:center;justify-content:center;color:var(--on-primary);font-size:.55rem;font-weight:700;letter-spacing:3px;box-shadow:0 0 20px var(--glow-strong)}
+
+/* ════════════════════════════════════════════════════════════
+   EXPERT SELECTOR COMPARISON
+   ════════════════════════════════════════════════════════════ */
+.exp-sel{display:flex;gap:8px;margin:24px 0 20px;flex-wrap:wrap}
+.exp-item{
+  position:relative;flex-shrink:0;width:64px;height:64px;border-radius:6px;overflow:hidden;
+  border:2px solid transparent;cursor:pointer;opacity:.5;
+  transition:opacity .2s,border-color .2s;background:none;padding:0;
+}
+.exp-item:hover{opacity:.8}
+.exp-item.exp-on{opacity:1;border-color:var(--primary)}
+.exp-item .vf-b{display:none}
+.exp-label{
+  position:absolute;bottom:3px;left:3px;
+  font-family:'Space Grotesk',monospace;font-size:.45rem;letter-spacing:.08em;
+  text-transform:uppercase;padding:1px 4px;background:rgba(0,0,0,.6);color:#fff;z-index:5;border-radius:2px;
+}
+.exp-cmp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.exp-cmp-card{position:relative;aspect-ratio:4/3;background:var(--surface-mid);overflow:hidden}
+/* Comparison slider inside expert panels */
+.exp-slider{position:relative;width:100%;height:100%;cursor:ew-resize;user-select:none;touch-action:none;overflow:hidden}
+.exp-sl-layer{position:absolute;inset:0}
+.exp-sl-left{z-index:1}
+.exp-sl-right{z-index:2;clip-path:inset(0 0 0 50%)}
+.exp-sl-left img,.exp-sl-right img{width:100%;height:100%;object-fit:cover}
+.exp-sl-handle{position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.5);z-index:10;transform:translateX(-50%)}
+.exp-sl-handle::after{content:'◀▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:.55rem;color:rgba(255,255,255,.95);letter-spacing:2px;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+.exp-sl-lbl{position:absolute;bottom:8px;padding:3px 10px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:rgba(255,255,255,.85);font-family:'Space Grotesk',monospace;font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;z-index:12}
+.exp-sl-lbl-l{left:8px}
+.exp-sl-lbl-r{right:8px}
+.exp-psnr{position:absolute;top:8px;right:8px;font-family:'Space Grotesk',monospace;font-size:.62rem;letter-spacing:.08em;padding:3px 10px;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);z-index:14}
+.exp-cmp-head{
+  font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--outline);margin-bottom:8px;
+}
+.exp-cmp-head em{font-style:normal;color:var(--primary)}
+/* Grid comparison with row labels */
+.grid-cmp-wrap{display:flex;gap:8px;align-items:stretch;margin-bottom:20px}
+.grid-cmp-labels{display:flex;flex-direction:column;justify-content:space-around;flex-shrink:0;padding:12px 0}
+.grid-cmp-lbl{writing-mode:vertical-lr;transform:rotate(180deg);font-family:'Sora',sans-serif;font-size:.78rem;font-weight:600;letter-spacing:.04em;color:var(--secondary);white-space:nowrap}
+
+/* ════════════════════════════════════════════════════════════
+   ZOOM GRID
+   ════════════════════════════════════════════════════════════ */
+.zg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:20px 0}
+.zi{position:relative;overflow:hidden;aspect-ratio:1;background:var(--surface-mid);cursor:zoom-in;transition:all .25s}
+.zi:hover{box-shadow:0 0 0 2px var(--primary-ctr),0 0 20px var(--glow)}
+.zi-in{width:100%;height:100%;transition:transform .35s;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--outline)}
+.zi:hover .zi-in{transform:scale(2)}
+.zi-t{position:absolute;bottom:4px;left:4px;font-family:'Space Grotesk',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;background:rgba(0,0,0,.6);color:#fff;z-index:5;pointer-events:none;transition:opacity .2s}
+.zi:hover .zi-t{opacity:0}
+
+/* ════════════════════════════════════════════════════════════
+   SECTION TYPOGRAPHY
+   ════════════════════════════════════════════════════════════ */
+.sl{font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:8px}
+.st{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.15;letter-spacing:-.02em;margin-bottom:14px}
+.sd{font-size:.95rem;color:var(--secondary);max-width:620px;line-height:1.78}
+
+/* Abstract */
+.abs{background:var(--surface-lo);padding:32px 36px;margin-top:28px;font-size:.92rem;line-height:1.85;color:var(--secondary);position:relative;border-left:3px solid var(--primary-ctr)}
+
+/* Contrib cards */
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:28px}
+.cc{background:var(--surface-mid);padding:26px;transition:all .3s;position:relative;border-top:2px solid transparent}
+.cc:hover{border-top-color:var(--primary-ctr);box-shadow:0 4px 30px var(--glow)}
+.cc-i{width:34px;height:34px;background:var(--glow);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:14px;border:1px solid var(--glass-brd)}
+.cc h4{font-size:.95rem;font-weight:600;margin-bottom:6px}.cc p{font-size:.86rem;color:var(--secondary);line-height:1.7}
+
+/* ════════════════════════════════════════════════════════════
+   METHOD — ARROW NAVIGATION
+   ════════════════════════════════════════════════════════════ */
+.meth-sec{position:relative;background:var(--surface);display:flex;flex-direction:column;padding:48px 28px clamp(24px,4vh,64px);max-width:1104px;margin:0 auto;box-sizing:content-box}
+.meth-sec::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:100vw;transform:translateX(-50%);background:inherit;z-index:-1}
+/* Title block */
+.meth-header{flex-shrink:0;padding:28px 0 24px}
+/* Content group */
+.meth-content{position:relative;flex:1;display:flex;flex-direction:column}
+/* Figure */
+.meth-fig{position:relative;width:min(80vh,960px);flex-shrink:0;background:var(--surface-lo);margin:0 auto}
+.meth-fig img{width:100%;display:block}
+.meth-fig-overlay{position:absolute;inset:0;opacity:0;transition:opacity .5s ease}
+.meth-fig-overlay.engaged{opacity:1}
+/* Dimming layer covers entire image */
+.meth-fig-dim{position:absolute;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:opacity .6s cubic-bezier(.4,0,.2,1),clip-path .5s cubic-bezier(.4,0,.2,1);opacity:0}
+[data-theme="light"] .meth-fig-dim{background:rgba(255,255,255,.85)}
+/* Each region is an absolute-positioned rectangle (cutout) */
+.meth-fig-region{position:absolute;background:transparent;transition:opacity .4s ease;opacity:0;pointer-events:none;z-index:1}
+.meth-fig-region.active{opacity:1}
+/* Region coordinates: left, top, width, height in % */
+.meth-fig-region[data-region="1"]{left:0.3%;top:8.1%;width:46.2%;height:50.4%}
+.meth-fig-region[data-region="2"]{left:41%;top:8.1%;width:27.6%;height:50.4%}
+.meth-fig-region[data-region="3"]{left:69.4%;top:8.1%;width:30.5%;height:50.8%}
+.meth-fig-region[data-region="4"]{left:0.3%;top:59.9%;width:99.6%;height:40%}
+/* Text area — clips sliding steps */
+.meth-text-area{position:relative;width:60%;margin:10px auto 0;overflow:hidden}
+/* Steps — slide animation */
+.meth-step{position:absolute;top:0;left:0;width:100%;opacity:0;pointer-events:none;transform:translateX(40px);transition:transform .4s cubic-bezier(.4,0,.2,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.meth-step.active{position:relative;opacity:1;transform:translateX(0);pointer-events:auto}
+.meth-step.exit-left{opacity:0;transform:translateX(-40px)}
+.meth-step.exit-right{opacity:0;transform:translateX(40px)}
+.meth-step.enter-left{transform:translateX(-40px)}
+.meth-step.enter-right{transform:translateX(40px)}
+.meth-step h4{font-family:'Sora',sans-serif;font-weight:600;font-size:clamp(1.1rem,1.8vh,1.4rem);margin-bottom:clamp(8px,1.2vh,14px)}
+.meth-step p{font-size:clamp(.88rem,1.4vh,1.1rem);color:var(--text);line-height:1.75;margin-bottom:clamp(8px,1.2vh,14px)}
+.meth-step-label{font-family:'Space Grotesk',monospace;font-size:clamp(.5rem,.85vh,.65rem);letter-spacing:.14em;text-transform:uppercase;color:var(--primary);margin-bottom:clamp(6px,1vh,12px);display:flex;align-items:center;gap:8px}
+.meth-step-label::before{content:'';width:16px;height:1px;background:var(--primary-ctr)}
+.mb{background:var(--surface-dim);padding:14px 18px;margin:12px 0;overflow-x:auto;text-align:center;font-size:.88rem;border:1px solid var(--ghost)}
+.meth-infer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.meth-infer-card{padding:14px;background:var(--surface-lo)}
+.meth-infer-card strong{display:block;margin-bottom:4px;font-size:.88rem}
+.meth-infer-card p{font-size:.82rem;color:var(--secondary);margin:0}
+/* Nav row: wraps arrows + dots */
+.meth-nav-row{position:relative;display:flex;justify-content:center;margin:2px auto 0;padding:2px 0}
+/* Arrow buttons — desktop: absolute on meth-content */
+.meth-arr{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:44px;height:44px;border-radius:50%;background:var(--surface-lo);border:1px solid var(--ghost);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--outline);transition:color .2s,background .2s,border-color .2s}
+.meth-arr:hover{color:var(--primary-ctr);background:var(--surface-mid);border-color:var(--primary-ctr)}
+.meth-arr.hint{animation:methArrHint 1.8s ease}
+@keyframes methArrHint{0%,100%{border-color:var(--ghost);color:var(--outline)}8%,25%{border-color:var(--primary-ctr);color:var(--primary-ctr)}33%{border-color:var(--ghost);color:var(--outline)}41%,58%{border-color:var(--primary-ctr);color:var(--primary-ctr)}66%{border-color:var(--ghost);color:var(--outline)}74%,91%{border-color:var(--primary-ctr);color:var(--primary-ctr)}}
+.meth-arr svg{width:20px;height:20px}
+.meth-arr-l{left:-56px}
+.meth-arr-r{right:-56px}
+/* Step indicator dots */
+.meth-dots{display:flex;justify-content:center;gap:10px;margin:0;padding:0}
+.meth-dot{width:8px;height:8px;border-radius:50%;border:none;background:var(--ghost);cursor:pointer;padding:0;transition:background .3s,transform .3s}
+.meth-dot:hover{background:var(--outline)}
+.meth-dot.active{background:var(--primary-ctr);transform:scale(1.3)}
+
+/* Editing section */
+.edit-sec{padding:64px 28px;max-width:1080px;margin:0 auto}
+
+/* Table */
+.tw{overflow-x:auto;margin:22px 0}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead th{background:var(--surface-lo);padding:10px 14px;text-align:center;font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);border-bottom:1px solid var(--outline-var)}
+thead th:first-child{text-align:left}
+tbody td{padding:9px 14px;text-align:center;border-bottom:1px solid var(--ghost);font-family:'Space Grotesk',monospace;font-size:.7rem;letter-spacing:.05em;color:var(--secondary)}
+tbody td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:500;color:var(--on-surface);letter-spacing:0}
+tbody tr:hover{background:var(--glow)}
+.br{background:var(--best-bg)!important}.br td{color:var(--primary)!important;font-weight:700!important}
+th.gh{font-size:.55rem;letter-spacing:.1em}
+
+/* ════════════════════════════════════════════════════════════
+   GP COMPARISON / BARS
+   ════════════════════════════════════════════════════════════ */
+.gpg{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0}
+@media(max-width:640px){.gpg{grid-template-columns:1fr}}
+.gpc{background:var(--surface-lo);padding:24px;transition:all .2s}
+.gpc:hover{background:var(--surface-mid)}
+.gpc-t{font-family:'Sora',sans-serif;font-size:.72rem;font-weight:600;letter-spacing:.02em;color:var(--secondary);margin-bottom:10px}
+.gpc-n{font-family:'Sora',sans-serif;font-weight:700;font-size:2.2rem;color:var(--on-surface);margin-bottom:4px}
+.gpc-u{font-size:.82rem;color:var(--outline);font-family:'Inter',sans-serif}
+.gpc-d{font-size:.86rem;color:var(--secondary);margin-top:8px;line-height:1.6}
+.gpc-b{display:inline-flex;align-items:center;gap:4px;margin-top:10px;padding:4px 10px;font-family:'Space Grotesk',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.gpc-ok{background:rgba(80,200,120,.08);color:var(--ok);border:1px solid rgba(80,200,120,.15)}
+.gpc-no{background:rgba(255,100,100,.06);color:var(--error);border:1px solid rgba(255,100,100,.1)}
+.gpc-nt{background:rgba(200,170,80,.06);color:var(--outline);border:1px solid rgba(200,170,80,.12)}
+/* Editing section grids */
+.cg-3{grid-template-columns:repeat(3,1fr)}
+.wf-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+
+.bt{font-size:.75rem;font-weight:600;margin-bottom:12px;color:var(--secondary);font-family:'Space Grotesk',monospace;letter-spacing:.06em;text-transform:uppercase}
+.br2{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.bl{width:100px;flex-shrink:0;font-size:.72rem;color:var(--secondary);text-align:right}
+.btr{flex:1;height:24px;background:var(--surface-mid);overflow:hidden}
+.bf{height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-family:'Space Grotesk',monospace;font-size:.58rem;color:#fff;font-weight:600;transition:width 1.2s ease}
+.bf-a{background:linear-gradient(90deg,var(--primary-ctr),#4dc8d6)}.bf-m{background:var(--outline)}.bf-g{background:linear-gradient(90deg,#c89b30,#e8b640)}
+
+/* Downstream flow diagram */
+.ds-flow{display:flex;align-items:center;gap:0;margin:32px 0 36px}
+.ds-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;opacity:0;transform:translateX(-24px);transition:opacity .6s ease,transform .6s ease}
+.ds-flow.vis .ds-step{opacity:1;transform:translateX(0)}
+.ds-flow.vis .ds-step:nth-child(1){transition-delay:0s}
+.ds-flow.vis .ds-step:nth-child(3){transition-delay:.9s}
+.ds-flow.vis .ds-step:nth-child(5){transition-delay:1.8s}
+.ds-box{padding:10px 14px;border:1px solid var(--ghost);background:var(--surface-mid);font-family:'Space Grotesk',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--secondary);white-space:nowrap;text-align:center;line-height:1.5}
+.ds-box-hero{border-color:var(--primary-ctr);background:linear-gradient(135deg,rgba(100,220,200,.08),rgba(100,220,200,.03));box-shadow:0 0 24px rgba(100,220,200,.1)}
+.ds-box-hero .ds-box-title{color:var(--primary);font-weight:700;font-size:.75rem}
+.ds-box-sub{font-size:.5rem;color:var(--outline);letter-spacing:.06em;margin-top:2px}
+.ds-box-icon{font-size:.95rem;margin-bottom:2px;line-height:1}
+.ds-arr{display:flex;align-items:center;flex-shrink:0;opacity:0;transition:opacity .5s ease}
+.ds-flow.vis .ds-arr{opacity:1}
+.ds-flow.vis .ds-arr:nth-child(2){transition-delay:.45s}
+.ds-flow.vis .ds-arr:nth-child(4){transition-delay:1.35s}
+.ds-arr svg{display:block}
+/* branch: vertical connector + arrows to tasks */
+.ds-branch{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-left:0;padding-left:20px;opacity:0;transform:translateX(-16px);transition:opacity .6s ease,transform .6s ease}
+.ds-flow.vis .ds-branch{opacity:1;transform:translateX(0);transition-delay:2.25s}
+.ds-branch::before{content:'';position:absolute;left:0;top:50%;width:20px;height:0;border-top:1.5px dashed var(--outline)}
+.ds-branch::after{content:'';position:absolute;left:20px;top:17px;bottom:17px;width:0;border-left:1.5px dashed var(--outline)}
+.ds-branch-row{display:flex;align-items:center;gap:0}
+.ds-branch-arr{flex-shrink:0;display:flex;align-items:center}
+.ds-branch-arr svg{display:block}
+.ds-task{padding:8px 12px;border:1px solid var(--ghost);background:var(--surface-mid);font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--secondary);white-space:nowrap;opacity:0;transform:translateY(8px);transition:opacity .5s ease,transform .5s ease,border-color .3s,box-shadow .3s}
+.ds-flow.vis .ds-task{opacity:1;transform:translateY(0);transition-delay:2.7s}
+.ds-task:hover{border-color:var(--primary-ctr);box-shadow:0 0 12px var(--glow)}
+/* mobile: vertical flow */
+@media(max-width:800px){
+/* main flow: stack vertically */
+.ds-flow{flex-direction:column;align-items:center;gap:0}
+.ds-step{transform:translateY(-20px) translateX(0)}
+.ds-flow.vis .ds-step{transform:translateY(0) translateX(0)}
+/* arrows between steps: CSS vertical dashed line + arrowhead */
+.ds-arr svg{display:none}
+.ds-arr{width:1.5px;height:32px;background:repeating-linear-gradient(to bottom,var(--outline) 0,var(--outline) 4px,transparent 4px,transparent 7px);position:relative}
+.ds-arr::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid var(--primary)}
+/* trident branch: 3 tasks in a row */
+.ds-branch{flex-direction:row;gap:10px;padding-left:0;padding-top:60px;margin-left:0;position:relative;transform:translateY(-16px) translateX(0);width:95%;overflow:visible}
+.ds-flow.vis .ds-branch{transform:translateY(0) translateX(0)}
+/* stem: vertical line from 3K Raw through bar to middle arrowhead */
+.ds-branch::before{content:'';position:absolute;top:0;left:50%;width:1.5px;height:52px;background:repeating-linear-gradient(to bottom,var(--outline) 0,var(--outline) 4px,transparent 4px,transparent 7px);transform:translateX(-50%)}
+/* horizontal bar: JS sets --bar-l / --bar-r */
+.ds-branch::after{content:'';position:absolute;top:20px;left:var(--bar-l,16%);right:var(--bar-r,16%);width:auto;height:0;bottom:auto;border-left:none;border-top:1.5px dashed var(--outline)}
+/* each task column: drop line + arrowhead + box */
+.ds-branch-row{flex:1;flex-direction:column;align-items:center;position:relative;padding-top:0;overflow:visible;min-width:0}
+.ds-branch-row::before{content:'';position:absolute;top:-40px;left:50%;width:1.5px;height:32px;background:repeating-linear-gradient(to bottom,var(--outline) 0,var(--outline) 4px,transparent 4px,transparent 7px);transform:translateX(-50%)}
+.ds-branch-row::after{content:'';position:absolute;top:-8px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid var(--primary)}
+.ds-branch-row:nth-child(2)::before{display:none}
+.ds-branch-arr{display:none}
+.ds-task{white-space:nowrap;text-align:center;min-width:0;padding:8px 10px;font-size:.52rem}
+.ds-mbr{display:block}
+}
+
+/* BibTeX */
+.bib{background:var(--surface-lo);padding:22px;position:relative;margin-top:22px}
+.bib pre{font-family:'Space Grotesk',monospace;font-size:.7rem;line-height:1.7;color:var(--secondary);white-space:pre-wrap;word-wrap:break-word;letter-spacing:.02em}
+.bib-c{position:absolute;top:10px;right:10px;padding:5px 13px;border:1px solid var(--ghost);background:var(--surface-mid);color:var(--secondary);font-family:'Space Grotesk',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;cursor:pointer;transition:all .2s}
+.bib-c:hover{border-color:var(--primary-ctr);color:var(--primary)}
+
+/* Footer */
+footer{padding:36px 0;border-top:1px solid var(--glass-brd)}
+footer .f-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+footer .f-name{font-family:'Sora',sans-serif;font-weight:600;color:var(--tertiary);font-size:1rem}
+footer .f-links{display:flex;gap:20px}
+footer .f-links a{font-family:'Space Grotesk',monospace;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--secondary);text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--primary-ctr)}
+footer .f-copy{font-family:'Space Grotesk',monospace;font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;color:var(--outline);opacity:.6}
+
+/* Pipeline */
+.pf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:18px 0}
+.ps{padding:7px 14px;background:var(--surface-lo);font-family:'Space Grotesk',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--secondary)}
+.ps.hi{background:var(--glow);color:var(--primary);border:1px solid var(--glass-brd)}
+.pa{color:var(--outline);font-size:.85rem}
+
+/* Animations */
+.rv{opacity:0;transform:translateY(20px);transition:opacity .55s,transform .55s}.rv.vis{opacity:1;transform:translateY(0)}
+.stg>*{opacity:0;transform:translateY(14px);transition:opacity .45s,transform .45s}
+.stg.vis>*:nth-child(1){transition-delay:0s;opacity:1;transform:translateY(0)}
+.stg.vis>*:nth-child(2){transition-delay:.08s;opacity:1;transform:translateY(0)}
+.stg.vis>*:nth-child(3){transition-delay:.16s;opacity:1;transform:translateY(0)}
+
+/* ── Responsive ── */
+@media(max-width:640px){
+  .hero{padding-top:105px}
+  .film-card{width:220px;height:138px}
+  .film-track{gap:4px}
+  .film-row{padding:2px 0}
+  .film-roll-label{font-size:.4rem;padding:1px 10px}
+  .film-lb-prev{left:-32px}.film-lb-next{right:-32px}
+  .film-lb-nav{font-size:1.2rem;padding:8px}
+  .film-lb-wrap{max-width:72vw;max-height:72vh}
+  .film-lb-wrap img{max-width:72vw;max-height:64vh}
+  .cg{grid-template-columns:1fr}
+  .zg{grid-template-columns:repeat(3,1fr)}
+  /* Method — mobile */
+  .meth-sec{padding:32px 16px;min-height:auto}
+  .meth-header .sd{font-size:.8rem;margin-bottom:6px}
+  .meth-header .pf{gap:2px;margin:8px 0;flex-wrap:nowrap}
+  .meth-header .pf .ps{padding:4px 6px;font-size:.38rem;letter-spacing:.02em}
+  .meth-header .pf .pa{font-size:.5rem}
+  .meth-header .st{font-size:clamp(1.3rem,3.5vw,1.8rem)}
+  .meth-fig{max-width:95%}
+  .meth-text-area{width:95%;max-height:35vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .meth-text-area::-webkit-scrollbar{display:none}
+  .meth-step.active{transform:translateX(0)}
+  .meth-infer-grid{grid-template-columns:1fr}
+  .meth-step h4{font-size:.9rem}
+  .meth-step p{font-size:.78rem}
+  .meth-arr{position:static;transform:none;width:28px;height:28px}
+  .meth-arr svg{width:14px;height:14px}
+  .meth-nav-row{display:flex;align-items:center;justify-content:center;gap:12px;margin:4px auto 0}
+  .meth-dots{gap:8px;margin:0;padding:0}
+  .meth-dot{width:7px;height:7px}
+  .cmp-s{aspect-ratio:4/3}
+  .gpg{grid-template-columns:1fr}
+  .cg-3{grid-template-columns:1fr}
+  .wf-grid{grid-template-columns:1fr}
+  .br-d{display:none}
+  .grid-cmp-wrap{gap:2px;margin-left:-28px;margin-right:-28px}
+  .grid-cmp-wrap .vf{padding:4px}
+  .grid-cmp-labels{padding:4px 0}
+  .grid-cmp-lbl{font-size:.4rem;letter-spacing:.03em}
+  .exp-sel{gap:6px;flex-wrap:nowrap}
+  .exp-item{width:52px;height:52px}
+  .exp-label{font-size:.38rem;padding:1px 3px}
+  .capture-frame{aspect-ratio:3/2}
+  .intro-grid{grid-template-columns:1fr;gap:28px}
+  .exp-cmp{grid-template-columns:1fr}
+  /* Fix 3: Table — compact for mobile */
+  table{font-size:.68rem}
+  thead th{padding:6px 6px;font-size:.5rem;letter-spacing:.06em}
+  tbody td{padding:6px 6px;font-size:.6rem}
+  .tw{margin:16px -28px;padding:0;overflow-x:auto}
+  /* Fix 5: Downstream bars — single column on mobile */
+  .bars-grid{grid-template-columns:1fr !important}
+  /* Camera viewer full width on mobile */
+  .cam-viewer{width:100%}
+  .cam-thumbs{justify-content:flex-start;padding:0 16px}
+  .cam-thumb{width:52px;height:52px}
+  .cam-tabs{gap:4px;padding:0 8px}
+  .cam-tab{font-size:.6rem;padding:6px 8px}
+}
+</style>
+</head>
+<body>
+<!-- NAV -->
+<nav class="nav"><div class="nav-in">
+<a href="#" class="nav-logo">RawGen</a>
+<div class="nav-r" id="navR">
+<span class="desk">
+<a href="#abstract">Abstract</a><a href="#showcase">Results</a><a href="#cameras">Cameras</a><a href="#method">Method</a><a href="#comparison">Comparison</a><a href="#downstream">Applications</a><a href="#citation">Cite</a>
+</span>
+<button class="thm" id="thm" title="Theme: System">◐</button>
+<button class="ham" id="ham"><span class="ham-line"></span><span class="ham-line"></span><span class="ham-line"></span></button>
+</div>
+</div></nav>
+
+<!-- ════ HERO ════ -->
+<section class="hero" id="top">
+<!-- Viewfinder decoration -->
+<div class="hero-vf"></div>
+<div class="hero-cross-h"></div>
+<div class="hero-cross-v"></div>
+<div class="hero-ticks"><span></span><span></span><span></span><span></span></div>
+<div class="hero-reticle"></div>
+<div class="hero-glow"></div>
+<div class="hero-corners"><div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div></div>
+<div class="wn">
+<h1><em>RawGen</em></h1>
+<p style="font-family:'Sora',sans-serif;font-weight:400;font-size:1.1rem;color:var(--on-surface-var);margin-bottom:20px;letter-spacing:-.01em">Learning Camera Raw Image Generation</p>
+<p class="hero-sub">
+A unified framework for <strong>text-to-raw</strong> and <strong>sRGB-to-raw</strong> generation across arbitrary camera sensors.
+</p>
+<p class="authors"><a href="https://www.dykim.me/" target="_blank">Dongyoung Kim</a><sup>1</sup> · <a href="https://junyonglee.me/" target="_blank">Junyong Lee</a><sup>1</sup>* · <a href="https://abhijithpunnappurath.github.io/" target="_blank">Abhijith Punnappurath</a><sup>1</sup>*<span class="nsep"> · </span><br class="wbr"><a href="https://www.mafifi.info/" target="_blank">Mahmoud Afifi</a><sup>1</sup>* · <a href="https://sites.google.com/view/sangmin-han/home" target="_blank">Sangmin Han</a><sup>2</sup> · <a href="https://scholar.google.com/citations?user=7EFMKWUAAAAJ&hl=en" target="_blank">Alex Levinshtein</a><sup>1</sup> · <a href="https://www.eecs.yorku.ca/~mbrown/" target="_blank">Michael S. Brown</a><sup>1</sup></p>
+<p class="affil"><sup>1</sup>AI Center – Toronto, Samsung Electronics &nbsp;&nbsp; <sup>2</sup>Yonsei University &nbsp;&nbsp; * Equal Contribution</p>
+<div class="hero-btns">
+<a href="#" class="btn btn-p">Paper</a>
+<a href="#" class="btn btn-s">Code (TBD)</a>
+<a href="#" class="btn btn-s">Video (TBD)</a>
+</div>
+</div>
+<div class="osd-bl">Coord_X: 43.6532<br>Coord_Y: -79.3832</div>
+<div class="osd-br">Rec [●]<br>ISO 100 · 1/250 · f/2.8</div>
+</section>
+
+<!-- ════ ABSTRACT + FOCUS → SHUTTER → CAPTURE (MERGED) ════ -->
+<section class="intro-sec" id="abstract"><div class="wm">
+<div class="intro-grid">
+<!-- Left: Abstract -->
+<div class="intro-left">
+<div class="sl">Abstract</div>
+<div class="st">The Challenge</div>
+<div class="intro-abs">
+Cameras capture scene-referred linear raw images, processed by ISPs into 8-bit sRGB. While raw data is more faithful for low-level vision, large-scale raw datasets remain scarce and device-specific. Existing diffusion models synthesize photo-finished sRGB, not physically consistent linear representations.
+</div>
+<p style="font-size:.9rem;color:var(--secondary);line-height:1.8;margin-bottom:20px">
+<strong style="color:var(--primary)">RawGen</strong> introduces a generative approach that learns the complex distribution of raw sensor data directly, enabling high-fidelity generation from either <em>text descriptions</em> or <em>standard sRGB images</em> across arbitrary camera sensors.
+</p>
+<div class="intro-contribs">
+<div class="intro-c"><div class="intro-c-dot"></div><p><strong>Many-to-One Reconstruction</strong>: Maps multiple photo-finished sRGB to a single canonical linear reference, robust to unknown ISPs.</p></div>
+<div class="intro-c"><div class="intro-c-dot"></div><p><strong>Camera-Agnostic Generation</strong>: First unified framework for text-driven linear and camera-specific raw synthesis without retraining.</p></div>
+<div class="intro-c"><div class="intro-c-dot"></div><p><strong>Scalable Data Synthesis</strong>: Text-to-raw alleviates data acquisition challenges in illuminant estimation, neural ISP, and denoising.</p></div>
+</div>
+</div>
+<!-- Right: Capture Animation -->
+<div>
+<div class="capture-frame vf vf-p" id="capFrame">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<div class="capture-img capture-raw"><img src="assets/images/teaser/capture-raw.png" alt="RAW output"></div>
+<div class="capture-img capture-srgb" id="capSrgb"><img src="assets/images/teaser/capture-srgb.webp" alt="sRGB input"></div>
+<div class="af-grid" id="afGrid"><div class="af-grid-inner">
+<div class="af-pt"></div><div class="af-pt"></div><div class="af-pt"></div>
+<div class="af-pt"></div><div class="af-pt"></div><div class="af-pt"></div>
+<div class="af-pt"></div><div class="af-pt"></div><div class="af-pt"></div>
+</div></div>
+<div class="cap-status"><div class="cap-dot cap-dot-focus" id="capDot"></div><span class="cap-text" id="capText">Focusing...</span></div>
+<div class="shutter-flash" id="capFlash"></div>
+<div class="cap-sensor">Sensor: Canon EOS-1Ds III</div>
+</div>
+</div>
+</div>
+</div></section>
+
+<!-- ════ 🔥 RESULTS GALLERY ════ -->
+<section class="showcase sec-alt" id="showcase"><div class="wm">
+<div class="sc-lbl">Experimental Results</div>
+<div class="sc-ttl">Results Showcase</div>
+<div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:16px;margin-bottom:4px">
+<p class="sc-desc" style="margin-bottom:0">RawGen generates camera raw images from sRGB inputs or text prompts. Click to zoom.</p>
+<div class="mode-tog"><button class="mode-b on" data-mode="i2r">Image to Raw</button><button class="mode-b" data-mode="t2r">Text to Raw</button></div>
+</div>
+
+<!-- I2R Film Gallery -->
+<div class="film-gallery" id="film-i2r"></div>
+<!-- T2R Film Gallery -->
+<div class="film-gallery" id="film-t2r" style="visibility:hidden;position:absolute;height:0"></div>
+</div></section>
+
+<!-- ════ CAMERA SELECTOR ════ -->
+<section class="cam-sec" id="cameras"><div class="wm rv">
+<div class="sl" style="text-align:center">Multi-Sensor Universal Adaptation</div>
+<div class="st" style="text-align:center">Any Camera. One Model.</div>
+<p class="sc-desc" style="text-align:center;margin:0 auto 32px">Each camera sensor has a unique spectral sensitivity; even under the same lighting and scene, different sensors produce different colors. RawGen learns this device-specific mapping, generating raw images for any target camera from a single trained model. Select a scene and camera to see the results.</p>
+<div class="cam-thumbs" id="camThumbs">
+<button class="cam-thumb on" data-scene="01"><img src="assets/images/cameras/thumbs/01.webp" alt="Scene 1"></button>
+<button class="cam-thumb" data-scene="02"><img src="assets/images/cameras/thumbs/02.webp" alt="Scene 2"></button>
+<button class="cam-thumb" data-scene="03"><img src="assets/images/cameras/thumbs/03.webp" alt="Scene 3"></button>
+<button class="cam-thumb" data-scene="04"><img src="assets/images/cameras/thumbs/04.webp" alt="Scene 4"></button>
+<button class="cam-thumb" data-scene="05"><img src="assets/images/cameras/thumbs/05.webp" alt="Scene 5"></button>
+<button class="cam-thumb" data-scene="06"><img src="assets/images/cameras/thumbs/06.webp" alt="Scene 6"></button>
+<button class="cam-thumb" data-scene="07"><img src="assets/images/cameras/thumbs/07.webp" alt="Scene 7"></button>
+<button class="cam-thumb" data-scene="08"><img src="assets/images/cameras/thumbs/08.webp" alt="Scene 8"></button>
+<button class="cam-thumb" data-scene="09"><img src="assets/images/cameras/thumbs/09.webp" alt="Scene 9"></button>
+<button class="cam-thumb" data-scene="10"><img src="assets/images/cameras/thumbs/10.webp" alt="Scene 10"></button>
+</div>
+<div class="cam-viewer vf vf-p" id="camViewer">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img id="camViewA" class="cam-front" src="assets/images/cameras/scenes/01/Canon1DsMkIII.webp" alt="Camera result">
+<img id="camViewB" class="cam-behind" src="assets/images/cameras/scenes/01/Canon1DsMkIII.webp" alt="Camera result" style="opacity:0">
+<button class="cam-arr cam-arr-l" id="camPrev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+<button class="cam-arr cam-arr-r" id="camNext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg></button>
+<div class="cam-counter" id="camCounter">Canon 1Ds III</div>
+</div>
+<div class="cam-tabs" id="camTabs">
+<button class="cam-tab on" data-cam="Canon1DsMkIII">Canon 1Ds III</button><button class="cam-tab" data-cam="Canon600D">Canon 600D</button><button class="cam-tab" data-cam="FujifilmXM1">Fujifilm X-M1</button><button class="cam-tab" data-cam="NikonD40">Nikon D40</button><button class="cam-tab" data-cam="NikonD5200">Nikon D5200</button><button class="cam-tab" data-cam="OlympusEPL6">Olympus E-PL6</button><button class="cam-tab" data-cam="PanasonicGX1">Panasonic GX1</button><button class="cam-tab" data-cam="SamsungNX2000">Samsung NX2000</button><button class="cam-tab" data-cam="SonyA57">Sony A57</button>
+</div>
+</div></section>
+
+<!-- ════ METHOD (ARROW NAV) ════ -->
+<section class="meth-sec" id="method">
+<div class="meth-header rv" id="methHeader">
+<div class="sl">Method</div>
+<div class="st" style="color:var(--tertiary)">The RawGen Architecture</div>
+<p class="sd">A three-stage generative pipeline built on FLUX.1-Kontext.</p>
+<div class="pf"><span class="ps hi">Raw → CIE XYZ</span><span class="pa">→</span><span class="ps">Diverse sRGB</span><span class="pa">→</span><span class="ps hi">DiT Fine-tune</span><span class="pa">→</span><span class="ps">VAE Decoder</span><span class="pa">→</span><span class="ps hi">I2R / T2R</span></div>
+</div>
+<div class="meth-content" id="methContent">
+<div class="meth-fig">
+<img src="assets/images/method/fig2-overview.webp" alt="Fig.2 Method Overview">
+<div class="meth-fig-overlay">
+<div class="meth-fig-dim" id="methDim"></div>
+<div class="meth-fig-region" data-region="1"></div>
+<div class="meth-fig-region" data-region="2"></div>
+<div class="meth-fig-region" data-region="3"></div>
+<div class="meth-fig-region" data-region="4"></div>
+</div>
+</div>
+<div class="meth-text-area" id="methTextArea">
+<div class="meth-step" data-step="0">
+<div class="meth-step-label">Overview</div>
+<h4>Three-Stage Generative Pipeline</h4>
+<p>RawGen converts arbitrary sRGB images or text prompts into sensor-realistic camera raw via three stages: <strong>(1)</strong> a many-to-one data construction that pairs diverse sRGB renditions with a single CIE XYZ anchor, <strong>(2)</strong> DiT denoiser and VAE decoder fine-tuning on the constructed pairs, and <strong>(3)</strong> unified Image-to-Raw / Text-to-Raw inference.</p>
+</div>
+<div class="meth-step" data-step="1">
+<div class="meth-step-label">Step 1 of 4: Data Construction</div>
+<h4>Many-to-One Training Data</h4>
+<p>From a raw image, we derive a CIE XYZ anchor. Then we generate <strong>N sRGB variants</strong> by randomizing white balance, tone-curve, and contrast.</p>
+<div class="mb">$z_{\text{sRGB}}^{(n)} = E_{\text{VAE}}\!\left(I_{\text{sRGB}}^{(n)}\right), \quad z_{\text{XYZ}} = E_{\text{VAE}}(I_{\text{XYZ}})$</div>
+</div>
+<div class="meth-step" data-step="2">
+<div class="meth-step-label">Step 2 of 4: Denoiser Fine-Tuning</div>
+<h4>DiT Denoiser Tuning</h4>
+<p>We tune the DiT to predict the rectified-flow velocity target using LoRA:</p>
+<div class="mb">$\mathcal{L}_{\text{denoise}} = \mathbb{E}_{n,t,\epsilon}\left\| v_{\text{gt}} - v_\theta(z_t, t;\, z_{\text{sRGB}}^{(n)})\right\|_2^2$</div>
+<p>sRGB context and noisy target latents are concatenated along the sequence dimension.</p>
+</div>
+<div class="meth-step" data-step="3">
+<div class="meth-step-label">Step 3 of 4: Decoder Fine-Tuning</div>
+<h4>VAE Decoder Tuning</h4>
+<p>The VAE decoder is retargeted from sRGB to linear XYZ:</p>
+<div class="mb">$\hat{I}_{\text{XYZ}} = D_{\text{VAE}}(z_{\text{XYZ}}), \quad \mathcal{L}_{\text{recon}} = \|\hat{I}_{\text{XYZ}} - I_{\text{XYZ}}\|_1$</div>
+</div>
+<div class="meth-step" data-step="4">
+<div class="meth-step-label">Step 4 of 4: Inference</div>
+<h4>I2R &amp; T2R Inference</h4>
+<div class="meth-infer-grid">
+<div class="meth-infer-card"><strong>🖼️ Image-to-Raw</strong><p>sRGB → VAE enc → DiT → XYZ latent → VAE dec → camera raw</p></div>
+<div class="meth-infer-card"><strong>✍️ Text-to-Raw</strong><p>Text → FLUX.1 latent → DiT → XYZ latent → VAE dec → camera raw</p></div>
+</div>
+</div>
+</div>
+<div class="meth-nav-row">
+<button class="meth-arr meth-arr-l" id="methPrev" aria-label="Previous step">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+</button>
+<div class="meth-dots" id="methDots">
+<button class="meth-dot active" data-dot="0" aria-label="Overview"></button>
+<button class="meth-dot" data-dot="1" aria-label="Step 1"></button>
+<button class="meth-dot" data-dot="2" aria-label="Step 2"></button>
+<button class="meth-dot" data-dot="3" aria-label="Step 3"></button>
+<button class="meth-dot" data-dot="4" aria-label="Step 4"></button>
+</div>
+<button class="meth-arr meth-arr-r" id="methNext" aria-label="Next step">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+</button>
+</div>
+</div>
+</section>
+
+<!-- ════ COMPARISON: EXPERT SELECTOR ════ -->
+<section class="sec" id="comparison"><div class="wm rv"><div class="wn">
+<div class="sl">Many-to-One Robustness</div>
+<div class="st">One Scene, Five Edits, <br class="br-d">One Reconstruction</div>
+<p class="sd">We evaluate on the MIT-Adobe FiveK dataset, where each scene is retouched by five professional photographers (Expert A–E) with distinct aesthetic preferences. Conventional methods fail when the input sRGB comes from an unknown rendering style, but RawGen's many-to-one training maps all five diverse renditions to a single canonical CIE XYZ, reliably recovering the same linear image regardless of photo-finishing.</p>
+
+<!-- Scene selector thumbnails -->
+<div class="exp-sel" id="expSel">
+<div class="exp-item exp-on vf" data-scene="1">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img src="assets/images/comparison/allinone/1_thumbnail.webp" alt="Scene 1" style="width:100%;height:100%;object-fit:cover">
+<span class="exp-label">Scene 1</span>
+</div>
+<div class="exp-item vf" data-scene="2">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img src="assets/images/comparison/allinone/2_thumbnail.webp" alt="Scene 2" style="width:100%;height:100%;object-fit:cover">
+<span class="exp-label">Scene 2</span>
+</div>
+<div class="exp-item vf" data-scene="3">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img src="assets/images/comparison/allinone/3_thumbnail.webp" alt="Scene 3" style="width:100%;height:100%;object-fit:cover">
+<span class="exp-label">Scene 3</span>
+</div>
+<div class="exp-item vf" data-scene="4">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img src="assets/images/comparison/allinone/4_thumbnail.webp" alt="Scene 4" style="width:100%;height:100%;object-fit:cover">
+<span class="exp-label">Scene 4</span>
+</div>
+<div class="exp-item vf" data-scene="5">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img src="assets/images/comparison/allinone/5_thumbnail.webp" alt="Scene 5" style="width:100%;height:100%;object-fit:cover">
+<span class="exp-label">Scene 5</span>
+</div>
+</div>
+
+<!-- Grid comparison image with row labels -->
+<div class="grid-cmp-wrap">
+<div class="grid-cmp-labels">
+<span class="grid-cmp-lbl">sRGB Input</span>
+<span class="grid-cmp-lbl" id="baselineLbl">CIE XYZ Net</span>
+<span class="grid-cmp-lbl" style="color:var(--primary);font-weight:600">RawGen (Ours)</span>
+<span class="grid-cmp-lbl">Ground Truth</span>
+</div>
+<div class="vf vf-p" style="background:var(--surface-lo);padding:12px;position:relative;flex:1;min-width:0">
+<div class="vf-b vf-tl"></div><div class="vf-b vf-tr"></div><div class="vf-b vf-bl"></div><div class="vf-b vf-br"></div>
+<img id="sceneGrid" src="assets/images/comparison/allinone/1.webp" alt="Many-to-one comparison grid" style="width:100%;display:block">
+</div>
+</div>
+
+<div class="tw">
+<table><thead><tr><th rowspan="2" style="text-align:left">Method</th><th colspan="2" class="gh">Expert A</th><th colspan="2" class="gh">Expert B</th><th colspan="2" class="gh">Expert C</th><th colspan="2" class="gh">Expert D</th><th colspan="2" class="gh">Expert E</th></tr><tr><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th></tr></thead>
+<tbody>
+<tr><td>CIE XYZ Net</td><td>19.60</td><td>.786</td><td>21.04</td><td>.843</td><td>19.49</td><td>.780</td><td>19.44</td><td>.806</td><td>18.64</td><td>.792</td></tr>
+<tr><td>InvISP</td><td>16.04</td><td>.685</td><td>16.04</td><td>.685</td><td>14.92</td><td>.632</td><td>14.24</td><td>.680</td><td>13.30</td><td>.647</td></tr>
+<tr><td>Raw-Diffusion</td><td>19.30</td><td>.783</td><td>20.66</td><td>.840</td><td>18.79</td><td>.771</td><td>18.69</td><td>.797</td><td>17.49</td><td>.775</td></tr>
+<tr class="br"><td>RawGen (Ours)</td><td>23.20</td><td>.843</td><td>24.35</td><td>.858</td><td>23.37</td><td>.839</td><td>23.51</td><td>.853</td><td>23.89</td><td>.850</td></tr>
+</tbody></table></div>
+<p style="font-family:'Space Grotesk',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--outline);margin-top:6px">Table 1: sRGB-to-XYZ on MIT-Adobe FiveK across five expert styles.</p>
+</div></div></section>
+
+<!-- ════ DOWNSTREAM ════ -->
+<section class="sec sec-alt" id="downstream"><div class="wn rv">
+<div class="sl">Downstream Utility</div>
+<div class="st">Scalable Raw Synthesis for Downstream Tasks</div>
+<p class="sd">Collecting device-specific raw data at scale is costly and labor-intensive. RawGen's Text-to-Raw pipeline generates diverse, camera-specific raw images from text prompts alone, without physical capture. With just 3K synthetic samples, downstream tasks like illuminant estimation, neural ISP learning, and raw denoising approach or exceed real-data performance.</p>
+
+<div class="ds-flow" id="ds-flow">
+<!-- Step 1: Text Prompt -->
+<div class="ds-step">
+<div class="ds-box"><div class="ds-box-icon">✏️</div><div>Text Prompt</div><div class="ds-box-sub">"A sunlit kitchen with warm tones"</div></div>
+</div>
+<!-- Arrow 1 -->
+<div class="ds-arr"><svg width="36" height="16" viewBox="0 0 36 16" fill="none"><line x1="0" y1="8" x2="26" y2="8" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="26,4 36,8 26,12" fill="var(--primary)"/></svg></div>
+<!-- Step 2: RawGen -->
+<div class="ds-step">
+<div class="ds-box ds-box-hero"><div class="ds-box-title">RawGen</div><div class="ds-box-sub">Text-to-Raw</div></div>
+</div>
+<!-- Arrow 2 -->
+<div class="ds-arr"><svg width="36" height="16" viewBox="0 0 36 16" fill="none"><line x1="0" y1="8" x2="26" y2="8" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="26,4 36,8 26,12" fill="var(--primary)"/></svg></div>
+<!-- Step 3: 3K Raw -->
+<div class="ds-step">
+<div class="ds-box"><div class="ds-box-icon">🗂️</div><div>3K Raw Images</div><div class="ds-box-sub">Camera-specific synthetic data</div></div>
+</div>
+<!-- Branching tasks -->
+<div class="ds-branch">
+<div class="ds-branch-row"><div class="ds-branch-arr"><svg width="28" height="14" viewBox="0 0 28 14" fill="none"><line x1="0" y1="7" x2="18" y2="7" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="18,3 28,7 18,11" fill="var(--primary)"/></svg></div><div class="ds-task">☀️ Illuminant<span class="ds-mbr"> </span>Estimation</div></div>
+<div class="ds-branch-row"><div class="ds-branch-arr"><svg width="28" height="14" viewBox="0 0 28 14" fill="none"><line x1="0" y1="7" x2="18" y2="7" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="18,3 28,7 18,11" fill="var(--primary)"/></svg></div><div class="ds-task">📷 Neural ISP</div></div>
+<div class="ds-branch-row"><div class="ds-branch-arr"><svg width="28" height="14" viewBox="0 0 28 14" fill="none"><line x1="0" y1="7" x2="18" y2="7" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="18,3 28,7 18,11" fill="var(--primary)"/></svg></div><div class="ds-task">🧽 Raw Denoising</div></div>
+</div>
+</div>
+
+<div class="bars-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:22px 28px;margin-top:28px">
+<div><div class="bt">Illuminant Estimation (Error ↓)</div>
+<div class="br2"><span class="bl">EnlightenGAN</span><div class="btr"><div class="bf bf-m" style="width:95%">7.01°</div></div></div>
+<div class="br2"><span class="bl">UPI</span><div class="btr"><div class="bf bf-m" style="width:85%">6.26°</div></div></div>
+<div class="br2"><span class="bl">Graphics2RAW</span><div class="btr"><div class="bf bf-m" style="width:57%">4.21°</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--primary);font-weight:600">RawGen</span><div class="btr"><div class="bf bf-a" style="width:42%">3.14°</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--outline);font-style:italic">Real data</span><div class="btr"><div class="bf bf-g" style="width:41%">3.02°</div></div></div></div>
+<div><div class="bt">Neural ISP (PSNR ↑)</div>
+<div class="br2"><span class="bl">EnlightenGAN</span><div class="btr"><div class="bf bf-m" style="width:72%">35.58</div></div></div>
+<div class="br2"><span class="bl">UPI</span><div class="btr"><div class="bf bf-m" style="width:78%">36.43</div></div></div>
+<div class="br2"><span class="bl">Graphics2RAW</span><div class="btr"><div class="bf bf-m" style="width:88%">38.10</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--primary);font-weight:600">RawGen</span><div class="btr"><div class="bf bf-a" style="width:90%">38.42</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--outline);font-style:italic">Real data</span><div class="btr"><div class="bf bf-g" style="width:89%">38.32</div></div></div></div>
+<div><div class="bt">Denoising ISO 1600 (PSNR ↑)</div>
+<div class="br2"><span class="bl">EnlightenGAN</span><div class="btr"><div class="bf bf-m" style="width:82%">48.82</div></div></div>
+<div class="br2"><span class="bl">UPI</span><div class="btr"><div class="bf bf-m" style="width:84%">49.05</div></div></div>
+<div class="br2"><span class="bl">Graphics2RAW</span><div class="btr"><div class="bf bf-m" style="width:86%">49.37</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--primary);font-weight:600">RawGen</span><div class="btr"><div class="bf bf-a" style="width:94%">50.63</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--outline);font-style:italic">Real data</span><div class="btr"><div class="bf bf-g" style="width:90%">49.80</div></div></div></div>
+<div><div class="bt">Denoising ISO 3200 (PSNR ↑)</div>
+<div class="br2"><span class="bl">EnlightenGAN</span><div class="btr"><div class="bf bf-m" style="width:80%">47.25</div></div></div>
+<div class="br2"><span class="bl">UPI</span><div class="btr"><div class="bf bf-m" style="width:82%">47.51</div></div></div>
+<div class="br2"><span class="bl">Graphics2RAW</span><div class="btr"><div class="bf bf-m" style="width:87%">48.16</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--primary);font-weight:600">RawGen</span><div class="btr"><div class="bf bf-a" style="width:92%">48.57</div></div></div>
+<div class="br2"><span class="bl" style="color:var(--outline);font-style:italic">Real data</span><div class="btr"><div class="bf bf-g" style="width:88%">48.25</div></div></div></div>
+</div>
+<details style="margin-top:22px"><summary style="cursor:pointer;color:var(--primary);font-family:'Space Grotesk',monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase">Show Full Table</summary>
+<div class="tw" style="margin-top:10px"><table><thead><tr><th rowspan="2" style="text-align:left">Method</th><th colspan="3" class="gh">Illuminant Est.</th><th colspan="2" class="gh">Neural ISP</th><th colspan="2" class="gh">Denoise 1600</th><th colspan="2" class="gh">Denoise 3200</th></tr><tr><th>Mean</th><th>Med</th><th>W25%</th><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th><th>PSNR</th><th>SSIM</th></tr></thead>
+<tbody><tr><td>EnlightenGAN</td><td>7.01</td><td>6.82</td><td>11.07</td><td>35.58</td><td>.965</td><td>48.82</td><td>.991</td><td>47.25</td><td>.988</td></tr><tr><td>UPI</td><td>6.26</td><td>5.89</td><td>10.33</td><td>36.43</td><td>.966</td><td>49.05</td><td>.990</td><td>47.51</td><td>.988</td></tr><tr><td>Graphics2RAW</td><td>4.21</td><td>3.38</td><td>8.57</td><td>38.10</td><td>.974</td><td>49.37</td><td>.991</td><td>48.16</td><td>.989</td></tr><tr class="br"><td>RawGen</td><td>3.14</td><td>2.11</td><td>7.37</td><td>38.42</td><td>.970</td><td>50.63</td><td>.994</td><td>48.57</td><td>.992</td></tr><tr><td style="font-style:italic;color:var(--outline)">Real</td><td>3.02</td><td>2.17</td><td>6.77</td><td>38.32</td><td>.974</td><td>49.80</td><td>.993</td><td>48.25</td><td>.990</td></tr></tbody></table></div></details>
+</div></section>
+
+<!-- ════ EDITING ════ -->
+<section class="sec" id="editing"><div class="wn rv">
+<div class="sl">Raw-Domain Editing</div>
+<div class="st">Generate Once, Edit Forever</div>
+<p class="sd">RawGen decouples content synthesis from rendering by producing a scene-referred linear image. Every downstream edit becomes a standard ISP operation, with no re-inference or retraining.</p>
+
+<!-- Three-paradigm comparison -->
+<div class="cg cg-3" style="margin-top:28px">
+<div class="cc">
+<div class="cc-i">🔃</div>
+<div class="gpc-t">Inverse-ISP Methods</div>
+<h4>Device-Specific Inversion</h4>
+<p>Tuned to specific cameras and fixed imaging assumptions. Heterogeneous sRGB inputs outside the training distribution often cause failures.</p>
+<span class="gpc-b gpc-nt">⚠ device-dependent</span>
+</div>
+<div class="cc">
+<div class="cc-i">🔄</div>
+<div class="gpc-t">Camera-Controllable Generation</div>
+<h4>Re-Inference Per Edit</h4>
+<div class="gpc-n" style="font-size:1.6rem">>20 <span class="gpc-u">sec / edit</span></div>
+<p>Re-runs full diffusion for every parameter change. Only supports parameters explicitly learned during training. New edit types require retraining.</p>
+<span class="gpc-b gpc-no">✕ fixed parameter set</span>
+</div>
+<div class="cc" style="border-top:2px solid var(--primary-ctr);box-shadow:0 0 20px var(--glow-strong), 0 0 40px var(--glow);border:1px solid rgba(0,229,255,.2);border-top:2px solid var(--primary-ctr)">
+<div class="cc-i" style="border-color:var(--primary-ctr)">⚡</div>
+<div class="gpc-t" style="color:var(--primary)">RawGen (Ours)</div>
+<h4>Generate Once, Edit Freely</h4>
+<div class="gpc-n" style="font-size:1.6rem">~0.53 <span class="gpc-u">ms / edit</span></div>
+<p>Generate a linear raw image once, then apply any ISP operation (white balance, exposure, tone mapping) with any software pipeline.</p>
+<span class="gpc-b gpc-ok">✓ all edit types supported</span>
+</div>
+</div>
+
+</div></section>
+
+<!-- ════ BIBTEX ════ -->
+<section class="sec sec-alt" id="citation"><div class="wn rv">
+<div class="sl">Citation</div><div class="st">BibTeX</div><p class="sd">If you find RawGen useful, please cite our work.</p>
+<div class="bib"><button class="bib-c" id="bibC">Copy</button><pre><code>@article{kim2026rawgen,
+  title     = {RawGen: Learning Camera Raw Image Generation},
+  author    = {Dongyoung Kim and Junyong Lee and Abhijith Punnappurath and Mahmoud Afifi and Sangmin Han and Alex Levinshtein and Michael S. Brown},
+  journal   = {arXiv preprint},
+  year      = {2026}
+}</code></pre></div>
+</div></section>
+
+<footer><div class="wm f-inner">
+<div class="f-copy">© RawGen</div>
+</div></footer>
+<!-- ════ JAVASCRIPT ════ -->
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const html=document.documentElement;
+
+  /* ── Theme: single button cycling auto → light → dark ── */
+  const thm=document.getElementById('thm');
+  const modes=['auto','light','dark'];
+  const icons={auto:'◐',light:'☀',dark:'☽'};
+  const titles={auto:'Theme: System',light:'Theme: Light',dark:'Theme: Dark'};
+  function getSystemTheme(){return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}
+  function applyMode(mode){
+    thm.textContent=icons[mode];thm.title=titles[mode];
+    if(mode==='auto'){
+      html.setAttribute('data-theme',getSystemTheme());
+      localStorage.setItem('rawgen-t','auto');
+    } else {
+      html.setAttribute('data-theme',mode);
+      localStorage.setItem('rawgen-t',mode);
+    }
+  }
+  const saved=localStorage.getItem('rawgen-t');
+  applyMode(modes.includes(saved)?saved:'auto');
+  thm.addEventListener('click',()=>{
+    const cur=localStorage.getItem('rawgen-t')||'auto';
+    const next=modes[(modes.indexOf(cur)+1)%3];
+    applyMode(next);
+  });
+  window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{
+    if((localStorage.getItem('rawgen-t')||'auto')==='auto') applyMode('auto');
+  });
+
+  /* ── Hamburger ── */
+  const ham=document.getElementById('ham'),navR=document.getElementById('navR');
+  ham.addEventListener('click',()=>{navR.classList.toggle('open');ham.classList.toggle('open')});
+  navR.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{navR.classList.remove('open');ham.classList.remove('open')}));
+
+  /* ── Active nav ── */
+  document.querySelectorAll('section[id]').forEach(s=>{
+    new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+      navR.querySelectorAll('a').forEach(a=>a.classList.remove('on'));
+      const t=navR.querySelector(`a[href="#${e.target.id}"]`);
+      if(t)t.classList.add('on');
+    }})},{rootMargin:'-35% 0px -60% 0px'}).observe(s);
+  });
+
+  /* ── Scroll reveal ── */
+  document.querySelectorAll('.rv,.stg,.ds-flow').forEach(el=>{
+    new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')})},{threshold:.08,rootMargin:'0px 0px -50px 0px'}).observe(el);
+  });
+
+  /* ── Downstream flow: align trident bar to first/last row centers ── */
+  function alignTrident(){
+    const branch=document.querySelector('.ds-branch');
+    if(!branch)return;
+    const rows=branch.querySelectorAll('.ds-branch-row');
+    if(rows.length<2)return;
+    const bRect=branch.getBoundingClientRect();
+    const first=rows[0].getBoundingClientRect();
+    const last=rows[rows.length-1].getBoundingClientRect();
+    const l=first.left+first.width/2-bRect.left;
+    const r=bRect.right-(last.left+last.width/2);
+    branch.style.setProperty('--bar-l',l+'px');
+    branch.style.setProperty('--bar-r',r+'px');
+  }
+  alignTrident();
+  window.addEventListener('resize',alignTrident);
+
+  /* ── Film strip gallery data ── */
+  const filmData = {
+    i2r: [
+      {file:'01-jmac-mg-1384',sensor:'Unknown',title:'Jmac Mg 1384'},
+      {file:'02-07-11-18-at-00h05m40s-mg',sensor:'Unknown',title:'07 11 18 At 00H05M40S Mg'},
+      {file:'03-kme-576',sensor:'Unknown',title:'Kme 576'},
+      {file:'04-img-1637',sensor:'Unknown',title:'Img 1637'},
+      {file:'05-img-0056',sensor:'Unknown',title:'Img 0056'},
+      {file:'06-wp-img-1592',sensor:'Unknown',title:'Wp Img 1592'},
+      {file:'07-img-4498',sensor:'Unknown',title:'Img 4498'},
+      {file:'08-dsc-0012-1',sensor:'Unknown',title:'Dsc 0012 1'},
+      {file:'09-wp-crw-4982',sensor:'Unknown',title:'Wp Crw 4982'},
+      {file:'10-img-5833',sensor:'Unknown',title:'Img 5833'},
+      {file:'11-dgw6291',sensor:'Unknown',title:'Dgw6291'},
+      {file:'12-dgw-066',sensor:'Unknown',title:'Dgw 066'},
+      {file:'13-dsc2777',sensor:'Unknown',title:'Dsc2777'},
+      {file:'14-07-07-15-at-23h51m48s-mg',sensor:'Unknown',title:'07 07 15 At 23H51M48S Mg'},
+      {file:'15-kme-447',sensor:'Unknown',title:'Kme 447'},
+      {file:'16-ls-060715-8780',sensor:'Unknown',title:'Ls 060715 8780'},
+      {file:'17-jmacdsc-0246',sensor:'Unknown',title:'Jmacdsc 0246'},
+      {file:'18-ji2e4450',sensor:'Unknown',title:'Ji2E4450'},
+      {file:'19-07-06-28-at-12h47m57s-mg',sensor:'Unknown',title:'07 06 28 At 12H47M57S Mg'},
+      {file:'20-kme-138',sensor:'Unknown',title:'Kme 138'},
+      {file:'21-dgw6290',sensor:'Unknown',title:'Dgw6290'},
+      {file:'22-kme-429',sensor:'Unknown',title:'Kme 429'},
+      {file:'23-img-5578',sensor:'Unknown',title:'Img 5578'},
+      {file:'24-ls-060724-8814',sensor:'Unknown',title:'Ls 060724 8814'},
+      {file:'25-dsc-0014',sensor:'Unknown',title:'Dsc 0014'},
+      {file:'26-img-4470',sensor:'Unknown',title:'Img 4470'},
+      {file:'27-kme-590',sensor:'Unknown',title:'Kme 590'},
+      {file:'28-dsc-0270',sensor:'Unknown',title:'Dsc 0270'},
+      {file:'29-kme-174',sensor:'Unknown',title:'Kme 174'},
+      {file:'30-kme-358',sensor:'Unknown',title:'Kme 358'},
+      {file:'31-07-08-11-at-18h19m52s-n0000238',sensor:'Unknown',title:'07 08 11 At 18H19M52S N0000238'},
+      {file:'32-ji2e3858',sensor:'Unknown',title:'Ji2E3858'},
+      {file:'33-mb-070908-069',sensor:'Unknown',title:'Mb 070908 069'},
+      {file:'34-dsc-0008-1',sensor:'Unknown',title:'Dsc 0008 1'},
+      {file:'35-kme-003',sensor:'Unknown',title:'Kme 003'},
+      {file:'36-img-0713',sensor:'Unknown',title:'Img 0713'},
+      {file:'37-07-12-01-at-12h52m44s-mg',sensor:'Unknown',title:'07 12 01 At 12H52M44S Mg'},
+      {file:'38-dgw6314',sensor:'Unknown',title:'Dgw6314'},
+      {file:'39-img-4173',sensor:'Unknown',title:'Img 4173'},
+      {file:'40-jmac-dsc2259',sensor:'Unknown',title:'Jmac Dsc2259'},
+      {file:'41-img-1050',sensor:'Unknown',title:'Img 1050'},
+      {file:'42-ke-0013',sensor:'Unknown',title:'Ke 0013'},
+      {file:'43-wp-crw-0723',sensor:'Unknown',title:'Wp Crw 0723'},
+      {file:'44-kme-0483',sensor:'Unknown',title:'Kme 0483'},
+      {file:'45-kme-0635',sensor:'Unknown',title:'Kme 0635'},
+      {file:'46-dsc-0043',sensor:'Unknown',title:'Dsc 0043'},
+      {file:'47-dsc0089',sensor:'Unknown',title:'Dsc0089'},
+      {file:'48-duggan-080114-4419',sensor:'Unknown',title:'Duggan 080114 4419'},
+      {file:'49-duggan-090127-4793',sensor:'Unknown',title:'Duggan 090127 4793'}
+    ],
+    t2r: [
+      {file:'001-there-is-a-man-and',sensor:'Canon EOS-1Ds III',title:'There Is A Man And',prompt:'There is a man and a woman standing near the table, possibly playing or observing the game. Additionally, there is a swing set in the background, which adds to the overall playful atmosphere of the park. The...'},
+      {file:'002-the-sheep-are-spread-out',sensor:'Canon EOS 600D',title:'The Sheep Are Spread Out',prompt:'The sheep are spread out across the hillside, with some of them closer to the water\'s edge. There is also a building visible in the background...'},
+      {file:'003-some-of-the-people-are',sensor:'Fujifilm X-M1',title:'Some Of The People Are',prompt:'Some of the people are dressed up as clowns, while others are wearing more traditional clothing. The group is standing on a street or plaza, likely in a festive...'},
+      {file:'004-the-water-is-calm-and',sensor:'Nikon D40',title:'The Water Is Calm And',prompt:'The water is calm and reflects the surrounding trees and sky. There is a rock in the middle of the lake, adding to the natural beauty of the scene.'},
+      {file:'005-the-building-is-situated-on',sensor:'Nikon D5200',title:'The Building Is Situated On',prompt:'The building is situated on a hillside, and there is a staircase leading up to it. The exterior of the building is adorned with various decorative elements, such as a...'},
+      {file:'006-the-bridge-connects-two-buildings',sensor:'Olympus E-PL6',title:'The Bridge Connects Two Buildings',prompt:'The bridge connects two buildings, one of which appears to be a castle-like structure. There are several lampposts along the bridge, providing illumination for the area...'},
+      {file:'007-the-sky-is-partly-cloudy',sensor:'Panasonic GX1',title:'The Sky Is Partly Cloudy',prompt:'The sky is partly cloudy, with a few white clouds visible in the blue sky. There is a lone sheep standing on the grassy slope, adding to the serene and...'},
+      {file:'008-the-building-is-adorned-with',sensor:'Samsung NX2000',title:'The Building Is Adorned With',prompt:'The building is adorned with intricate architectural details, such as arches and decorative designs. There are several windows visible in the building, providing natural light to illuminate the interior space. The...'},
+      {file:'009-the-sun-is-shining-brightly',sensor:'Sony A57',title:'The Sun Is Shining Brightly',prompt:'The sun is shining brightly in the sky, casting a warm and inviting glow over the landscape. There are also some rocks and boulders scattered around the area, adding to the rugged terrain.'},
+      {file:'010-the-landscape-is-characterized-by',sensor:'Canon EOS-1Ds III',title:'The Landscape Is Characterized By',prompt:'The landscape is characterized by the vast expanse of the field and the presence of the distant mountains. The sky appears to be partly cloudy, adding to the natural beauty of the scene...'},
+      {file:'011-the-statue-is-located-near',sensor:'Canon EOS 600D',title:'The Statue Is Located Near',prompt:'The statue is located near a group of people who are walking around the park, enjoying the sunny day. There are several green chairs placed around the area, providing seating...'},
+      {file:'012-there-are-also-some-people',sensor:'Fujifilm X-M1',title:'There Are Also Some People',prompt:'There are also some people sitting on benches nearby, enjoying the scenery. The area is illuminated by streetlights,...'},
+      {file:'013-they-appear-to-be-attending',sensor:'Nikon D40',title:'They Appear To Be Attending',prompt:'They appear to be attending an outdoor event, possibly a festival or a reenactment of a historical event. There are several people in the group, with...'},
+      {file:'014-the-building-s-windows-are',sensor:'Nikon D5200',title:'The Building S Windows Are',prompt:'The building\'s windows are partially covered by the snow, adding to the visual interest of the scene. The lighting in the image is bright and contrasting, highlighting the snowflakes...'},
+      {file:'015-there-are-no-other-animals',sensor:'Olympus E-PL6',title:'There Are No Other Animals',prompt:'There are no other animals or people visible in the scene. The setting is peaceful and idyllic, with the sheep seemingly enjoying the serene environment.'},
+      {file:'016-the-hallway-is-adorned-with',sensor:'Panasonic GX1',title:'The Hallway Is Adorned With',prompt:'The hallway is adorned with intricate paintings and decorations, adding to the grandeur of the space. The people are walking towards the end of the hallway, creating a sense of...'},
+      {file:'018-these-tents-are-likely-used',sensor:'Sony A57',title:'These Tents Are Likely Used',prompt:'These tents are likely used for outdoor events, such as markets or fairs, as they provide a covered area for vendors to showcase their products or services. The tents...'},
+      {file:'019-there-are-several-people-walking',sensor:'Canon EOS-1Ds III',title:'There Are Several People Walking',prompt:'There are several people walking around the field, enjoying the sunny day and the green surroundings. The sky is partly cloudy, adding to the overall serene atmosphere of the scene.'},
+      {file:'020-the-bird-is-sitting-on',sensor:'Canon EOS 600D',title:'The Bird Is Sitting On',prompt:'The bird is sitting on the ball-shaped structure at the top of the water feature. There are also lights hanging from the ceiling of the building, adding to the...'},
+      {file:'021-the-carousel-appears-to-be',sensor:'Fujifilm X-M1',title:'The Carousel Appears To Be',prompt:'The carousel appears to be well-lit, providing a bright and cheerful environment for the riders.'},
+      {file:'023-the-mural-is-adorned-with',sensor:'Nikon D5200',title:'The Mural Is Adorned With',prompt:'The mural is adorned with various coats of arms and other decorative elements, adding to the grandeur of the space. The room is well-lit...'},
+      {file:'024-there-is-also-a-house',sensor:'Olympus E-PL6',title:'There Is Also A House',prompt:'There is also a house visible in the distance, situated on the hillside. The landscape is characterized by rolling hills and a rural setting, providing a serene and peaceful atmosphere...'},
+      {file:'025-the-bench-is-situated-near',sensor:'Panasonic GX1',title:'The Bench Is Situated Near',prompt:'The bench is situated near the water\'s edge, providing a scenic view of the lake and the surrounding landscape. A bridge can also be seen in the background, adding to the tranquil atmosphere of the...'},
+      {file:'027-the-building-has-a-stone',sensor:'Sony A57',title:'The Building Has A Stone',prompt:'The building has a stone facade and appears to be quite old, possibly dating back to the 1800s or earlier. The people in the scene are dressed casually...'},
+      {file:'028-the-valley-is-filled-with',sensor:'Canon EOS-1Ds III',title:'The Valley Is Filled With',prompt:'The valley is filled with various types of vegetation, such as grass, bushes, and trees, creating a vibrant and colorful landscape. The sky is partly cloudy, adding to the...'},
+      {file:'029-the-sunlight-creates-a-warm',sensor:'Canon EOS 600D',title:'The Sunlight Creates A Warm',prompt:'The sunlight creates a warm and inviting atmosphere, adding to the serene and peaceful nature of the scene.'},
+      {file:'030-there-are-several-trees-in',sensor:'Fujifilm X-M1',title:'There Are Several Trees In',prompt:'There are several trees in the background, and the overall atmosphere is peaceful and serene. The lighting in the scene appears to be natural, with the sun shining down on the...'},
+      {file:'031-the-landscape-is-covered-in',sensor:'Nikon D40',title:'The Landscape Is Covered In',prompt:'The landscape is covered in grass and dotted with trees, giving it a serene and peaceful atmosphere. The sky appears to be cloudy, adding to the overall mood of...'},
+      {file:'032-he-is-positioned-near-the',sensor:'Nikon D5200',title:'He Is Positioned Near The',prompt:'He is positioned near the front of the boat and appears to be overseeing the vessel\'s operations. The boat is surrounded by water, and there is...'},
+      {file:'033-the-statues-are-arranged-in',sensor:'Olympus E-PL6',title:'The Statues Are Arranged In',prompt:'The statues are arranged in a symmetrical manner, showcasing their beauty and craftsmanship. The hallway also features a window, allowing natural light to illuminate the...'},
+      {file:'034-the-water-is-partially-obscured',sensor:'Panasonic GX1',title:'The Water Is Partially Obscured',prompt:'The water is partially obscured by the surrounding vegetation, adding to the natural and organic feel of the scene. The lighting in the image is soft and diffused...'},
+      {file:'037-the-structure-is-made-up',sensor:'Canon EOS-1Ds III',title:'The Structure Is Made Up',prompt:'The structure is made up of several arches and pillars, and it appears to be in a state of disrepair, with some of the arches...'},
+      {file:'038-there-are-several-people-walking',sensor:'Canon EOS 600D',title:'There Are Several People Walking',prompt:'There are several people walking around the market, admiring the various paintings and other artwork on display. The lighting appears to be cloudy and overcast, adding to the atmosphere of...'},
+      {file:'039-there-are-several-people-sitting',sensor:'Fujifilm X-M1',title:'There Are Several People Sitting',prompt:'There are several people sitting in the audience, some of them wearing backpacks. The room is well-lit, with multiple lights illuminating the space.'},
+      {file:'040-they-are-carrying-various-items',sensor:'Nikon D40',title:'They Are Carrying Various Items',prompt:'They are carrying various items, such as bags, suitcases, and umbrellas, as they navigate through the crowded street. There is a man standing in the middle of...'},
+      {file:'041-the-event-features-a-stage',sensor:'Nikon D5200',title:'The Event Features A Stage',prompt:'The event features a stage with a large screen displaying a projected image of a person, possibly a performer or a speaker. There are several people standing near...'},
+      {file:'042-there-is-a-crane-visible',sensor:'Olympus E-PL6',title:'There Is A Crane Visible',prompt:'There is a crane visible in the background, likely involved in construction or maintenance work. The scene is illuminated by sunlight, casting a bright and...'},
+      {file:'043-the-sun-is-shining-brightly',sensor:'Samsung NX2000',title:'The Sun Is Shining Brightly',prompt:'The sun is shining brightly, illuminating the snowy landscape and providing a clear view of the person skiing.'},
+      {file:'045-the-building-has-a-rustic',sensor:'Canon EOS-1Ds III',title:'The Building Has A Rustic',prompt:'The building has a rustic appearance and is situated in a mountainous area, possibly in the Swiss Alps. The sun is shining down on the building, casting a warm and inviting light on the exterior...'},
+      {file:'046-there-is-a-statue-in',sensor:'Canon EOS 600D',title:'There Is A Statue In',prompt:'There is a statue in the center of the garden, which is surrounded by greenery and shrubs. The area is well-maintained and has a serene atmosphere, making it an ideal spot for relaxation...'},
+      {file:'047-the-horse-is-standing-on',sensor:'Fujifilm X-M1',title:'The Horse Is Standing On',prompt:'The horse is standing on its hind legs, with its front legs stretched out in front of it. The sculpture is lit by a spotlight, which highlights the intricate details of the horse...'},
+      {file:'048-the-children-appear-to-be',sensor:'Nikon D40',title:'The Children Appear To Be',prompt:'The children appear to be participating in a parade or festival, as they are wearing festive clothing and holding balloons. The crowd is watching the...'},
+      {file:'049-the-valley-is-filled-with',sensor:'Nikon D5200',title:'The Valley Is Filled With',prompt:'The valley is filled with trees, including pine trees, and there are houses visible in the distance. The overall atmosphere is peaceful and serene, with a cloudy sky adding to the tranqu...'},
+      {file:'050-the-sun-is-shining-brightly',sensor:'Olympus E-PL6',title:'The Sun Is Shining Brightly',prompt:'The sun is shining brightly in the background, casting a warm and inviting light on the scene. The person appears to be enjoying the peaceful and scenic surround...'},
+      {file:'051-the-trees-are-in-full',sensor:'Panasonic GX1',title:'The Trees Are In Full',prompt:'The trees are in full bloom, creating a picturesque setting for the photograph. There is a fence running along the side of the street, providing a boundary between the trees and the...'},
+      {file:'052-the-house-has-multiple-windows',sensor:'Samsung NX2000',title:'The House Has Multiple Windows',prompt:'The house has multiple windows and a balcony, giving it a spacious and inviting appearance. The snowy surroundings add to the serene and peaceful atmosphere of the scene...'},
+      {file:'053-they-appear-to-be-enjoying',sensor:'Sony A57',title:'They Appear To Be Enjoying',prompt:'They appear to be enjoying the scenic view of the mountains in the distance. The sky is partly cloudy, with some fluffy white clouds visible in the background.'},
+      {file:'054-the-building-is-decorated-with',sensor:'Canon EOS-1Ds III',title:'The Building Is Decorated With',prompt:'The building is decorated with intricate carvings on its walls, giving it a unique and impressive appearance. The woman is wearing a pink jacket and appears to...'},
+      {file:'055-the-buildings-are-situated-on',sensor:'Canon EOS 600D',title:'The Buildings Are Situated On',prompt:'The buildings are situated on a hillside, and the church tower stands out against the cloudy sky. There are also several trees visible in the scene, adding to the overall atmosphere of the setting.'},
+      {file:'056-they-appear-to-be-waiting',sensor:'Fujifilm X-M1',title:'They Appear To Be Waiting',prompt:'They appear to be waiting for something, possibly an event or a tour. There are several rows of chairs lined up in the courtyard, providing seating for the people.'},
+      {file:'057-the-town-is-surrounded-by',sensor:'Nikon D40',title:'The Town Is Surrounded By',prompt:'The town is surrounded by trees, and there is a pathway leading through the grassy area. A lamp post is visible in the foreground, providing lighting for the pathway.'},
+      {file:'060-the-cow-appears-to-be',sensor:'Panasonic GX1',title:'The Cow Appears To Be',prompt:'The cow appears to be looking at the camera, as if posing for a photo. The sun is shining brightly in the background, casting a warm and inviting light on the scene.'},
+      {file:'061-the-sign-reads-tulipa-s',sensor:'Samsung NX2000',title:'The Sign Reads Tulipa S',prompt:'The sign reads "Tulipa\'s Wonderland" and is placed in the center of the tulip field. There are many other tulipes around the sign, creating a...'},
+      {file:'062-the-water-is-calm-and',sensor:'Sony A57',title:'The Water Is Calm And',prompt:'The water is calm and serene, creating a peaceful atmosphere. There are several trees surrounding the lake, providing shade and adding to the natural beauty of the scene.'},
+      {file:'063-the-building-has-several-balconies',sensor:'Canon EOS-1Ds III',title:'The Building Has Several Balconies',prompt:'The building has several balconies and awnings, giving it a unique appearance. There is also a yellow car parked in front of the building, adding to the vibrant and...'},
+      {file:'064-they-are-accompanied-by-adults',sensor:'Canon EOS 600D',title:'They Are Accompanied By Adults',prompt:'They are accompanied by adults and other people, creating a festive atmosphere. The parade is likely part of a celebration or event, with the children dressed up as...'},
+      {file:'065-the-building-is-surrounded-by',sensor:'Fujifilm X-M1',title:'The Building Is Surrounded By',prompt:'The building is surrounded by trees and bushes, and there are mountains visible in the background. The cloudy sky adds to the overall atmosphere of the scene.'},
+      {file:'067-a-boat-can-be-seen',sensor:'Nikon D5200',title:'A Boat Can Be Seen',prompt:'A boat can be seen sailing along the canal, adding to the picturesque atmosphere of the location. There is a clear blue sky in the background,...'},
+      {file:'068-the-building-has-several-windows',sensor:'Olympus E-PL6',title:'The Building Has Several Windows',prompt:'The building has several windows and appears to be quite old, possibly dating back to the 1800s or earlier. There are trees surrounding the building and the river, adding to the serene atmosphere...'},
+      {file:'069-the-flowers-appear-to-be',sensor:'Panasonic GX1',title:'The Flowers Appear To Be',prompt:'The flowers appear to be small and delicate, adding a touch of color and beauty to the overall scene.'},
+      {file:'070-they-are-accompanied-by-adults',sensor:'Samsung NX2000',title:'They Are Accompanied By Adults',prompt:'They are accompanied by adults and other people, creating a festive atmosphere. There is a building in the background, possibly serving as a venue for the event. The scene is well-lit...'},
+      {file:'071-the-building-is-situated-in',sensor:'Sony A57',title:'The Building Is Situated In',prompt:'The building is situated in a residential area, surrounded by trees and bushes. There is a sidewalk next to the building, and a street sign can be seen on the sidewalk near the building\'s entrance. The...'},
+      {file:'072-the-building-has-a-lamp',sensor:'Canon EOS-1Ds III',title:'The Building Has A Lamp',prompt:'The building has a lamp post in front of it, providing illumination for the area. There is also a car parked near the building, adding to the overall winter atmosphere.'},
+      {file:'073-the-building-is-surrounded-by',sensor:'Canon EOS 600D',title:'The Building Is Surrounded By',prompt:'The building is surrounded by other tall buildings, and there is a statue in front of the building as well. The scene is set against a clear blue sky, providing a beautiful backdrop for the architecture.'},
+      {file:'074-the-boats-are-anchored-in',sensor:'Fujifilm X-M1',title:'The Boats Are Anchored In',prompt:'The boats are anchored in the middle of the lake, creating a peaceful and serene atmosphere. The water is surrounded by lush green mountains, adding to the pictures...'},
+      {file:'075-the-street-is-lined-with',sensor:'Nikon D40',title:'The Street Is Lined With',prompt:'The street is lined with tall buildings on both sides, and there is a do not enter sign hanging from one of the buildings. A car is parked on the side of the street, and...'},
+      {file:'076-the-building-is-situated-in',sensor:'Nikon D5200',title:'The Building Is Situated In',prompt:'The building is situated in a cityscape, surrounded by other buildings and trees. There is a clear blue sky visible in the background, providing a bright and sunny atmosphere. The...'},
+      {file:'077-the-snow-covered-peaks-stretch',sensor:'Olympus E-PL6',title:'The Snow Covered Peaks Stretch',prompt:'The snow-covered peaks stretch out as far as the eye can see, creating a breathtaking landscape.'},
+      {file:'078-the-woman-is-sitting-on',sensor:'Panasonic GX1',title:'The Woman Is Sitting On',prompt:'The woman is sitting on top of the deer, and she appears to be holding a bow and arrow. The sculpture is made of white marble and is placed on a pedestal, showcasing...'},
+      {file:'079-the-valley-is-filled-with',sensor:'Samsung NX2000',title:'The Valley Is Filled With',prompt:'The valley is filled with wildflowers and grasses, creating a vibrant and colorful landscape. There is also a wooden bench in the foreground, providing a resting spot for visitors...'},
+      {file:'080-the-painting-depicts-the-annunciation',sensor:'Sony A57',title:'The Painting Depicts The Annunciation',prompt:'The painting depicts the Annunciation, which is the announcement by the angel Gabriel to the Virgin Mary that she will give birth to Jesus Christ. The woman in the painting is...'},
+      {file:'081-the-river-is-filled-with',sensor:'Canon EOS-1Ds III',title:'The River Is Filled With',prompt:'The river is filled with water, and there is a small waterfall in the background. A person is standing near the river, possibly enjoying the scenery or taking a photo.'},
+      {file:'082-the-village-is-surrounded-by',sensor:'Canon EOS 600D',title:'The Village Is Surrounded By',prompt:'The village is surrounded by trees, and there are several houses visible in the scene. The hillside is covered with lush grass, making it an idyllic setting for the village. The...'},
+      {file:'083-the-street-is-lined-with',sensor:'Fujifilm X-M1',title:'The Street Is Lined With',prompt:'The street is lined with tall buildings and trees, creating a scenic view of the cityscape. The sun is shining brightly in the sky, casting a warm and inviting light...'},
+      {file:'084-there-are-several-people-visible',sensor:'Nikon D40',title:'There Are Several People Visible',prompt:'There are several people visible in the scene, including a child and an adult. The alley is surrounded by various architectural elements, such as arches, windows, and...'},
+      {file:'085-the-bench-provides-a-scenic',sensor:'Nikon D5200',title:'The Bench Provides A Scenic',prompt:'The bench provides a scenic view of the natural surroundings, including the water and the mountains in the background. The lighting in the scene...'},
+      {file:'086-the-monument-is-likely-the',sensor:'Olympus E-PL6',title:'The Monument Is Likely The',prompt:'The monument is likely the Obelisk of Theodosius, which is located in the Piazza del Popolo in Rome, Italy. The plaza...'},
+      {file:'087-the-tower-has-a-clock',sensor:'Panasonic GX1',title:'The Tower Has A Clock',prompt:'The tower has a clock on its top, and there is a boat docked near the tower. The scene is illuminated by sunlight, casting shadows on...'},
+      {file:'088-the-building-has-several-windows',sensor:'Samsung NX2000',title:'The Building Has Several Windows',prompt:'The building has several windows and balconies, giving it a grand and imposing appearance. The clock is visible on the front of the building, adding to its architect...'},
+      {file:'089-the-bottle-appears-to-be',sensor:'Sony A57',title:'The Bottle Appears To Be',prompt:'The bottle appears to be open, and the person is preparing to celebrate or enjoy the champagne. The scene takes place in an indoor setting, possibly a party or event venue...'},
+      {file:'090-the-building-appears-to-be',sensor:'Canon EOS-1Ds III',title:'The Building Appears To Be',prompt:'The building appears to be an old castle or mansion, with its reflection visible in the water. The setting is characterized by a serene and peaceful atmosphere, making it an ideal location...'},
+      {file:'091-the-pathway-is-lined-with',sensor:'Canon EOS 600D',title:'The Pathway Is Lined With',prompt:'The pathway is lined with trees and bushes, creating a serene and peaceful atmosphere. The setting appears to be in a mountainous area, with the surrounding mountains visible...'},
+      {file:'092-there-is-also-an-airport',sensor:'Fujifilm X-M1',title:'There Is Also An Airport',prompt:'There is also an airport terminal building in the background, which suggests that the airplane is preparing to take off or has just landed. The sun is shining brightly...'},
+      {file:'094-the-building-appears-to-be',sensor:'Nikon D5200',title:'The Building Appears To Be',prompt:'The building appears to be an apartment or a house, as there are several windows visible on the upper floors. The greenery on the building\'s exterior gives it a lush and vibrant...'},
+      {file:'095-the-water-is-calm-and',sensor:'Olympus E-PL6',title:'The Water Is Calm And',prompt:'The water is calm, and the birds appear to be enjoying their time in the water. The scene is characterized by a serene atmosphere, with the birds peacefully sw...'},
+      {file:'096-a-small-cabin-or-hut',sensor:'Panasonic GX1',title:'A Small Cabin Or Hut',prompt:'A small cabin or hut can be seen perched on the side of the mountain, providing a sense of isolation and remoteness. The sun is shining brightly...'},
+      {file:'097-the-building-has-a-stone',sensor:'Samsung NX2000',title:'The Building Has A Stone',prompt:'The building has a stone facade, and there are tables and chairs placed outside, creating an outdoor dining area. The setting appears to be peaceful and inviting, perfect for enjoying a me...'},
+      {file:'098-there-are-several-trees-surrounding',sensor:'Sony A57',title:'There Are Several Trees Surrounding',prompt:'There are several trees surrounding the area, providing a natural setting for the people to enjoy their walk. The stairs lead down to a lower level, where there are more trees and a park-like...'},
+      {file:'099-the-building-is-surrounded-by',sensor:'Canon EOS-1Ds III',title:'The Building Is Surrounded By',prompt:'The building is surrounded by tall grass and weeds, and there is a person standing near the entrance of the building. The setting appears to be an ancient ruin, possibly from the Roman...'},
+      {file:'100-the-town-is-visible-from',sensor:'Canon EOS 600D',title:'The Town Is Visible From',prompt:'The town is visible from a distance, with houses and buildings visible in the background. There is a tree in the foreground of the image, providing shade and adding to...'},
+      {file:'101-the-water-is-calm-and',sensor:'Fujifilm X-M1',title:'The Water Is Calm And',prompt:'The water is calm and reflects the surrounding landscape, creating a peaceful and picturesque setting. The grassy area around the lake adds to the natural beauty of the scene, making it an ideal location for...'},
+      {file:'102-the-building-appears-to-be',sensor:'Nikon D40',title:'The Building Appears To Be',prompt:'The building appears to be in a state of disrepair, as it is surrounded by overgrown grass and weeds. The sun is shining in the background, casting a bright light on the...'},
+      {file:'103-they-are-standing-close-to',sensor:'Nikon D5200',title:'They Are Standing Close To',prompt:'They are standing close to each other, with their masks covering their faces. There is a third person in the background, but they are not wearing masks. The scene is...'},
+      {file:'104-the-staircase-is-illuminated-by',sensor:'Olympus E-PL6',title:'The Staircase Is Illuminated By',prompt:'The staircase is illuminated by a single light fixture, casting a warm and inviting glow over the area. The people are moving towards the top of the stairs, creating a sense...'},
+      {file:'105-the-misty-atmosphere-adds-to',sensor:'Panasonic GX1',title:'The Misty Atmosphere Adds To',prompt:'The misty atmosphere adds to the mysterious and enchanting atmosphere of the forest, making it an ideal location for a peaceful walk or hike.'},
+      {file:'106-the-street-is-surrounded-by',sensor:'Samsung NX2000',title:'The Street Is Surrounded By',prompt:'The street is surrounded by mountains, which can be seen in the background, adding to the serene and peaceful setting. The lighting in the scene is dim, casting a soft g...'},
+      {file:'107-the-vineyards-are-lush-and',sensor:'Sony A57',title:'The Vineyards Are Lush And',prompt:'The vineyards are lush and green, with rows of grapevines stretching out across the landscape. The mountainous backdrop provides a picturesque setting for this rural area.'},
+      {file:'108-there-are-several-benches-along',sensor:'Canon EOS-1Ds III',title:'There Are Several Benches Along',prompt:'There are several benches along the path, providing seating for people to rest and enjoy the scenic view of the lake. The path also leads to a wooden bridge over the lake, allowing visitors to cross over and explore the...'},
+      {file:'109-the-trail-is-lined-with',sensor:'Canon EOS 600D',title:'The Trail Is Lined With',prompt:'The trail is lined with a wooden fence, adding to the rustic charm of the area. The foggy atmosphere creates a mystical and peaceful atmosphere, making it an ideal location...'},
+      {file:'110-the-necklace-is-adorned-with',sensor:'Fujifilm X-M1',title:'The Necklace Is Adorned With',prompt:'The necklace is adorned with different types of beads, including clear, brown, and gold-colored beads. Additionally, there is a small...'},
+      {file:'111-the-building-is-surrounded-by',sensor:'Nikon D40',title:'The Building Is Surrounded By',prompt:'The building is surrounded by a moat, which is filled with water, and there is a bridge connecting the castle to the other side of the moat. The castle\'s exterior is adorned...'},
+      {file:'112-there-are-two-people-standing',sensor:'Nikon D5200',title:'There Are Two People Standing',prompt:'There are two people standing in the park, one near a bench and the other near a tree. The lighting in the scene appears to be bright and sunny, casting a...'},
+      {file:'113-the-building-is-surrounded-by',sensor:'Olympus E-PL6',title:'The Building Is Surrounded By',prompt:'The building is surrounded by various vehicles, including cars, motorcycles, and bicycles, indicating that it is an active area with a lot of traffic. The...'},
+      {file:'114-there-are-several-windmills-in',sensor:'Panasonic GX1',title:'There Are Several Windmills In',prompt:'There are several windmills in the farm, each with its own unique design and color. The farm is well-maintained and appears to be a popular tourist attraction, as there are...'},
+      {file:'115-the-sun-is-shining-brightly',sensor:'Samsung NX2000',title:'The Sun Is Shining Brightly',prompt:'The sun is shining brightly, casting a warm and inviting light on the landscape. The mountain range is visible in the background, adding to the serene and...'},
+      {file:'116-there-is-also-a-bed',sensor:'Sony A57',title:'There Is Also A Bed',prompt:'There is also a bed in the room, which is positioned near the shelves. The lighting appears to be bright and well-...'},
+      {file:'117-the-room-is-dimly-lit',sensor:'Canon EOS-1Ds III',title:'The Room Is Dimly Lit',prompt:'The room is dimly lit, with only a small amount of natural light coming in through the window. The shelves are filled with various...'},
+      {file:'118-the-people-are-standing-on',sensor:'Canon EOS 600D',title:'The People Are Standing On',prompt:'The people are standing on the steps leading up to the entrance of the building, and there are several potted plants placed around the area, adding to the...'},
+      {file:'119-the-statue-is-made-of',sensor:'Fujifilm X-M1',title:'The Statue Is Made Of',prompt:'The statue is made of stone and appears to be quite large. There are two other statues in the same room, but they are smaller in size and not as prominent as the main statue. The statues...'}
+    ]
+  };
+
+  /* ── Build film gallery ── */
+  function buildFilmGallery(mode, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const items = filmData[mode];
+    const rows = 3;
+    const perRow = Math.ceil(items.length / rows);
+    const basePath = 'assets/images/results/' + mode + '/';
+
+    for (let r = 0; r < rows; r++) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'film-row';
+      const label = document.createElement('div');
+      label.className = 'film-roll-label';
+      label.textContent = 'ROLL ' + String(r + 1).padStart(2, '0') + ' / ' + mode.toUpperCase() + ' / ' + items.length + ' FRAMES';
+      rowEl.appendChild(label);
+      const track = document.createElement('div');
+      track.className = 'film-track';
+      const start = r * perRow;
+      const end = Math.min(start + perRow, items.length);
+      const rowItems = items.slice(start, end);
+
+      for (let pass = 0; pass < 2; pass++) {
+        rowItems.forEach((item, idx) => {
+          const globalIdx = start + idx;
+          const card = document.createElement('div');
+          card.className = 'film-card';
+          card.dataset.mode = mode;
+          card.dataset.idx = globalIdx;
+          const img = document.createElement('img');
+          img.alt = item.title;
+          img.dataset.src = basePath + item.file + '.webp';
+          img.src = '';
+          img.style.display = 'none';
+          card.appendChild(img);
+          const ph = document.createElement('div');
+          ph.className = 'fc-placeholder';
+          ph.style.background = 'linear-gradient(' + (120 + globalIdx * 7) + 'deg,' +
+            'hsl(' + (180 + globalIdx * 5) % 360 + ',25%,18%),' +
+            'hsl(' + (200 + globalIdx * 5) % 360 + ',20%,12%))';
+          ph.textContent = item.title;
+          card.appendChild(ph);
+          if (mode !== 'i2r') {
+            const sensor = document.createElement('span');
+            sensor.className = 'fc-sensor';
+            sensor.textContent = item.sensor;
+            card.appendChild(sensor);
+          }
+          if (item.prompt) {
+            const prompt = document.createElement('div');
+            prompt.className = 'fc-prompt';
+            prompt.textContent = '"' + item.prompt + '"';
+            card.appendChild(prompt);
+          }
+          card.addEventListener('click', (e) => { if (!e.target.closest('.film-track.dragged')) openLightbox(mode, globalIdx); });
+          track.appendChild(card);
+        });
+      }
+      rowEl.appendChild(track);
+      container.appendChild(rowEl);
+    }
+
+    // Lazy load with IntersectionObserver
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const img = e.target.querySelector('img[data-src]');
+          if (img && img.dataset.src) {
+            img.src = img.dataset.src;
+            img.onload = () => {
+              img.style.display = 'block';
+              const ph = e.target.querySelector('.fc-placeholder');
+              if (ph) ph.style.display = 'none';
+            };
+            img.onerror = () => { /* keep placeholder on error */ };
+            delete img.dataset.src;
+          }
+          observer.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 300px' });
+
+    container.querySelectorAll('.film-card').forEach(c => observer.observe(c));
+  }
+
+  buildFilmGallery('i2r', 'film-i2r');
+  buildFilmGallery('t2r', 'film-t2r');
+
+  /* ── Film track drag-to-scroll ── */
+  document.querySelectorAll('.film-track').forEach(track => {
+    let dragging = false, startX = 0, baseOffset = 0;
+    let savedReverse = false, savedDurSec = 60;
+
+    function getTranslateX(el) {
+      const st = getComputedStyle(el);
+      const m = new DOMMatrix(st.transform);
+      return m.m41;
+    }
+
+    function onDown(x) {
+      dragging = true;
+      startX = x;
+      track.classList.remove('dragged');
+      // Save animation properties BEFORE killing animation
+      const cs = getComputedStyle(track);
+      savedReverse = cs.animationDirection === 'reverse';
+      savedDurSec = parseFloat(cs.animationDuration) || 60;
+      track.style.animationPlayState = 'paused';
+      baseOffset = getTranslateX(track);
+      track.style.animation = 'none';
+      track.style.transform = 'translateX(' + baseOffset + 'px)';
+    }
+
+    function onMove(x) {
+      if (!dragging) return;
+      const dx = x - startX;
+      if (Math.abs(dx) > 5) track.classList.add('dragged');
+      track.style.transform = 'translateX(' + (baseOffset + dx) + 'px)';
+    }
+
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      setTimeout(() => track.classList.remove('dragged'), 50);
+      // Resume CSS animation from current drag position
+      const cur = getTranslateX(track);
+      const totalW = track.scrollWidth / 2;
+      // Normalize into -totalW..0 range (animation goes 0 → -50%)
+      let norm = cur % totalW;
+      if (norm > 0) norm -= totalW;
+      // fraction through the animation (0 = start, 1 = end)
+      let frac = Math.abs(norm) / totalW;
+      if (savedReverse) frac = 1 - frac;
+      const delaySec = frac * savedDurSec;
+      // Kill animation, force reflow, then restore from stylesheet
+      track.style.transform = '';
+      track.style.animation = 'none';
+      void track.offsetWidth;
+      track.style.removeProperty('animation');
+      track.style.animationDelay = '-' + delaySec + 's';
+    }
+
+    // Mouse events
+    track.addEventListener('mousedown', e => { e.preventDefault(); onDown(e.clientX); });
+    window.addEventListener('mousemove', e => { if (dragging) onMove(e.clientX); });
+    window.addEventListener('mouseup', onUp);
+
+    // Touch events
+    track.addEventListener('touchstart', e => onDown(e.touches[0].clientX), { passive: true });
+    track.addEventListener('touchmove', e => onMove(e.touches[0].clientX), { passive: true });
+    track.addEventListener('touchend', onUp);
+  });
+
+  /* ── Lightbox ── */
+  const lbEl = document.createElement('div');
+  lbEl.className = 'film-lb';
+  lbEl.innerHTML = '<div class="film-lb-wrap">' +
+    '<button class="film-lb-close">&times;</button>' +
+    '<div class="film-lb-img-wrap">' +
+    '<button class="film-lb-nav film-lb-prev">&#8249;</button>' +
+    '<button class="film-lb-nav film-lb-next">&#8250;</button>' +
+    '<img class="lb-single" src="" alt="">' +
+    '<div class="lb-cmp" style="display:none">' +
+    '<div class="lb-cmp-left"><img src="" alt=""></div>' +
+    '<div class="lb-cmp-right"><img src="" alt=""></div>' +
+    '<div class="lb-cmp-handle"></div>' +
+    '<span class="lb-cmp-lbl lb-cmp-lbl-l">FLUX.1</span>' +
+    '<span class="lb-cmp-lbl lb-cmp-lbl-r">RawGen<br><span class="lb-cmp-sensor"></span></span>' +
+    '</div>' +
+    '</div>' +
+    '<div class="film-lb-meta"><div class="lb-title"></div><div class="lb-sensor"></div><div class="lb-prompt"></div>' +
+    '<div class="lb-illum-toggle"><button class="lb-illum-btn on" data-illum="0">Illum 1</button><button class="lb-illum-btn" data-illum="1">Illum 2</button></div></div>' +
+    '<div class="film-lb-counter"></div>' +
+    '</div>';
+  document.body.appendChild(lbEl);
+
+  let lbMode = 'i2r', lbIdx = 0, lbIllum = 0;
+
+  function openLightbox(mode, idx) {
+    lbMode = mode;
+    lbIdx = idx;
+    lbIllum = 0;
+    resetSliderPos();
+    updateLightbox();
+    lbEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    lbEl.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  const lbSingle = lbEl.querySelector('.lb-single');
+  const lbCmp = lbEl.querySelector('.lb-cmp');
+  const lbCmpLeft = lbCmp.querySelector('.lb-cmp-left img');
+  const lbCmpRight = lbCmp.querySelector('.lb-cmp-right img');
+  const lbCmpRightLayer = lbCmp.querySelector('.lb-cmp-right');
+  const lbCmpHandle = lbCmp.querySelector('.lb-cmp-handle');
+  const lbCmpLblL = lbCmp.querySelector('.lb-cmp-lbl-l');
+  const lbCmpLblR = lbCmp.querySelector('.lb-cmp-lbl-r');
+  let lbCmpPos = 50; // slider position %
+
+  function resetSliderPos() {
+    lbCmpPos = 50;
+    lbCmpRightLayer.style.clipPath = 'inset(0 0 0 50%)';
+    lbCmpHandle.style.left = '50%';
+  }
+
+  function updateLightbox() {
+    const items = filmData[lbMode];
+    const item = items[lbIdx];
+    const suffix = (lbMode === 't2r' && lbIllum === 1) ? '-alt' : '';
+    const isT2r = lbMode === 't2r';
+
+    if (isT2r) {
+      lbSingle.style.display = 'none';
+      lbCmp.style.display = 'block';
+      const srgbNum = item.file.match(/^\d+/)[0].padStart(4, '0');
+      lbCmpLeft.src = 'assets/images/results/t2r/' + srgbNum + '-srgb.webp';
+      lbCmpRight.src = 'assets/images/results/t2r/' + item.file + suffix + '.webp';
+      lbCmp.querySelector('.lb-cmp-sensor').textContent = item.sensor || '';
+    } else {
+      lbSingle.style.display = '';
+      lbCmp.style.display = 'none';
+      lbSingle.src = 'assets/images/results/' + lbMode + '/' + item.file + '.webp';
+    }
+
+    lbEl.querySelector('.lb-title').textContent = '';
+    lbEl.querySelector('.lb-sensor').textContent = '';
+    const promptEl = lbEl.querySelector('.lb-prompt');
+    promptEl.textContent = item.prompt ? '"' + item.prompt + '"' : '';
+    lbEl.querySelector('.film-lb-counter').textContent = (lbIdx + 1) + ' / ' + items.length;
+    // Illumination toggle visibility
+    const illumToggle = lbEl.querySelector('.lb-illum-toggle');
+    illumToggle.style.display = isT2r ? 'flex' : 'none';
+    lbEl.querySelectorAll('.lb-illum-btn').forEach(b => {
+      b.classList.toggle('on', parseInt(b.dataset.illum) === lbIllum);
+    });
+    // Sync meta width to rendered image width
+    const meta = lbEl.querySelector('.film-lb-meta');
+    const refImg = isT2r ? lbCmpLeft : lbSingle;
+    const syncWidth = () => { if (refImg.offsetWidth) meta.style.maxWidth = refImg.offsetWidth + 'px'; };
+    refImg.decode ? refImg.decode().then(syncWidth).catch(syncWidth) : (refImg.onload = syncWidth);
+    syncWidth();
+  }
+
+  // Comparison slider drag
+  let lbCmpDrag = false;
+  function updateSlider(clientX) {
+    const rect = lbCmp.getBoundingClientRect();
+    let pct = ((clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(0, Math.min(100, pct));
+    lbCmpPos = pct;
+    lbCmpRightLayer.style.clipPath = 'inset(0 0 0 ' + pct + '%)';
+    lbCmpHandle.style.left = pct + '%';
+    lbCmpLblL.style.opacity = pct < 15 ? '0' : '1';
+    lbCmpLblR.style.opacity = pct > 85 ? '0' : '1';
+  }
+  lbCmp.addEventListener('mousedown', e => { e.preventDefault(); lbCmpDrag = true; updateSlider(e.clientX); });
+  window.addEventListener('mousemove', e => { if (lbCmpDrag) updateSlider(e.clientX); });
+  window.addEventListener('mouseup', () => { lbCmpDrag = false; });
+  lbCmp.addEventListener('touchstart', e => { lbCmpDrag = true; updateSlider(e.touches[0].clientX); }, {passive:true});
+  lbCmp.addEventListener('touchmove', e => { if (lbCmpDrag) { e.preventDefault(); updateSlider(e.touches[0].clientX); } }, {passive:false});
+  lbCmp.addEventListener('touchend', () => { lbCmpDrag = false; });
+
+  // Illumination toggle click handlers
+  lbEl.querySelectorAll('.lb-illum-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      lbIllum = parseInt(btn.dataset.illum);
+      updateLightbox();
+    });
+  });
+
+  lbEl.querySelector('.film-lb-close').addEventListener('click', closeLightbox);
+  lbEl.addEventListener('click', e => { if (e.target === lbEl) closeLightbox(); });
+  lbEl.querySelector('.film-lb-prev').addEventListener('click', e => {
+    e.stopPropagation();
+    lbIdx = (lbIdx - 1 + filmData[lbMode].length) % filmData[lbMode].length;
+    lbIllum = 0;
+    resetSliderPos();
+    updateLightbox();
+  });
+  lbEl.querySelector('.film-lb-next').addEventListener('click', e => {
+    e.stopPropagation();
+    lbIdx = (lbIdx + 1) % filmData[lbMode].length;
+    lbIllum = 0;
+    resetSliderPos();
+    updateLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (!lbEl.classList.contains('open')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') { lbIdx = (lbIdx - 1 + filmData[lbMode].length) % filmData[lbMode].length; lbIllum = 0; resetSliderPos(); updateLightbox(); }
+    if (e.key === 'ArrowRight') { lbIdx = (lbIdx + 1) % filmData[lbMode].length; lbIllum = 0; resetSliderPos(); updateLightbox(); }
+  });
+
+  // Touch swipe for lightbox
+  let lbTouchX = 0;
+  lbEl.addEventListener('touchstart', e => { lbTouchX = e.touches[0].clientX; }, {passive:true});
+  lbEl.addEventListener('touchend', e => {
+    if (lbCmpDrag) return; // don't swipe-navigate during slider drag
+    const dx = e.changedTouches[0].clientX - lbTouchX;
+    if (Math.abs(dx) > 50) {
+      if (dx > 0) { lbIdx = (lbIdx - 1 + filmData[lbMode].length) % filmData[lbMode].length; }
+      else { lbIdx = (lbIdx + 1) % filmData[lbMode].length; }
+      lbIllum = 0;
+      resetSliderPos();
+      updateLightbox();
+    }
+  });
+
+  /* ── I2R / T2R toggle ── */
+  const filmI2r = document.getElementById('film-i2r');
+  const filmT2r = document.getElementById('film-t2r');
+  function showFilm(el, show){
+    if(show){el.style.visibility='';el.style.position='';el.style.height='';}
+    else{el.style.visibility='hidden';el.style.position='absolute';el.style.height='0';}
+  }
+  document.querySelectorAll('.mode-b').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-b').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    showFilm(filmI2r, b.dataset.mode==='i2r');
+    showFilm(filmT2r, b.dataset.mode==='t2r');
+  }));
+
+  /* ── Camera viewer: thumbnail + camera selector ── */
+  const camCameras = [
+    'Canon1DsMkIII','Canon600D','FujifilmXM1','NikonD40','NikonD5200',
+    'OlympusEPL6','PanasonicGX1','SamsungNX2000','SonyA57'
+  ];
+  const camLabels = {
+    Canon1DsMkIII:'Canon 1Ds III',Canon600D:'Canon 600D',FujifilmXM1:'Fujifilm X-M1',
+    NikonD40:'Nikon D40',NikonD5200:'Nikon D5200',OlympusEPL6:'Olympus E-PL6',
+    PanasonicGX1:'Panasonic GX1',SamsungNX2000:'Samsung NX2000',SonyA57:'Sony A57'
+  };
+  let camScene = '01', camCam = 'Canon1DsMkIII';
+  const camImgA = document.getElementById('camViewA');
+  const camImgB = document.getElementById('camViewB');
+  const camCounter = document.getElementById('camCounter');
+  let camFront = 'A';
+  const camPreloaded = {};
+
+  function camPath(scene, cam) {
+    return 'assets/images/cameras/scenes/' + scene + '/' + cam + '.webp';
+  }
+
+  function preloadScene(scene) {
+    if (camPreloaded[scene]) return;
+    camPreloaded[scene] = {};
+    camCameras.forEach(c => {
+      const img = new Image();
+      img.src = camPath(scene, c);
+      camPreloaded[scene][c] = img;
+    });
+  }
+  preloadScene('01');
+
+  function showCamImage() {
+    const src = camPath(camScene, camCam);
+    const cached = camPreloaded[camScene] && camPreloaded[camScene][camCam];
+    const behind = (camFront === 'A') ? camImgB : camImgA;
+    const front = (camFront === 'A') ? camImgA : camImgB;
+
+    function doSwap() {
+      behind.className = 'cam-front';
+      behind.style.opacity = '1';
+      front.className = 'cam-behind';
+      front.style.opacity = '0';
+      camFront = (camFront === 'A') ? 'B' : 'A';
+    }
+
+    // Keep behind hidden while loading
+    behind.style.opacity = '0';
+    behind.className = 'cam-behind';
+
+    if (cached && cached.complete) {
+      behind.src = cached.src;
+      // Use requestAnimationFrame to ensure the src is painted before swap
+      requestAnimationFrame(() => requestAnimationFrame(doSwap));
+    } else {
+      const tmp = new Image();
+      tmp.onload = () => {
+        behind.src = tmp.src;
+        requestAnimationFrame(() => requestAnimationFrame(doSwap));
+      };
+      tmp.src = src;
+    }
+    camCounter.textContent = camLabels[camCam];
+  }
+
+  // Thumbnail click
+  document.querySelectorAll('.cam-thumb').forEach(t => {
+    t.addEventListener('mouseenter', () => preloadScene(t.dataset.scene));
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.cam-thumb').forEach(x => x.classList.remove('on'));
+      t.classList.add('on');
+      camScene = t.dataset.scene;
+      preloadScene(camScene);
+      showCamImage();
+    });
+  });
+
+  // Camera tab click
+  document.querySelectorAll('.cam-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.cam-tab').forEach(x => x.classList.remove('on'));
+      t.classList.add('on');
+      camCam = t.dataset.cam;
+      showCamImage();
+    });
+  });
+
+  // Arrow nav: cycle through cameras
+  document.getElementById('camPrev').addEventListener('click', () => {
+    const idx = camCameras.indexOf(camCam);
+    camCam = camCameras[(idx - 1 + camCameras.length) % camCameras.length];
+    document.querySelectorAll('.cam-tab').forEach(x => x.classList.toggle('on', x.dataset.cam === camCam));
+    showCamImage();
+  });
+  document.getElementById('camNext').addEventListener('click', () => {
+    const idx = camCameras.indexOf(camCam);
+    camCam = camCameras[(idx + 1) % camCameras.length];
+    document.querySelectorAll('.cam-tab').forEach(x => x.classList.toggle('on', x.dataset.cam === camCam));
+    showCamImage();
+  });
+
+  /* ── Method arrow navigation ── */
+  const methOverlay = document.querySelector('.meth-fig-overlay');
+  const methDim = document.getElementById('methDim');
+  const methRegions = document.querySelectorAll('.meth-fig-region');
+  const methSteps = document.querySelectorAll('.meth-step');
+  const methTextArea = document.getElementById('methTextArea');
+  const methDots = document.querySelectorAll('.meth-dot');
+  const methPrev = document.getElementById('methPrev');
+  const methNext = document.getElementById('methNext');
+  const METH_TOTAL = 5;
+  const methRegionBoxes = [
+    null,                          // Step 0: Overview (full image, no highlight)
+    [0.3, 8.1, 46.5, 58.5],      // Step 1: Data Construction
+    [41, 8.1, 68.6, 58.5],        // Step 2: (A) Denoiser Fine-tune
+    [69.4, 8.1, 99.9, 58.9],     // Step 3: (B) Decoder Fine-tune
+    [0.3, 59.9, 99.9, 99.9]      // Step 4: (C) Inference Phase
+  ];
+  let methCurStep = -1;
+
+  function setMethStep(newStep, direction){
+    if(newStep === methCurStep) return;
+    const oldStep = methCurStep;
+    methCurStep = newStep;
+
+    // Update overlay regions
+    methRegions.forEach(r=>r.classList.toggle('active', +r.dataset.region===newStep));
+    if(methDim){
+      if(newStep === 0 || !methRegionBoxes[newStep]){
+        methDim.style.opacity = '0';
+      } else {
+        const [l, t, r, b] = methRegionBoxes[newStep];
+        const legendB = 8;
+        methDim.style.clipPath = `polygon(evenodd, 0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 0% 0%, 0% ${legendB}%, 100% ${legendB}%, 100% 0%, 0% 0%, ${l}% ${t}%, ${l}% ${b}%, ${r}% ${b}%, ${r}% ${t}%, ${l}% ${t}%)`;
+        methDim.style.opacity = '1';
+      }
+    }
+    methOverlay.classList.toggle('engaged', newStep > 0);
+
+    // Slide animation
+    if(oldStep >= 0 && direction !== 0){
+      const oldEl = methSteps[oldStep];
+      const newEl = methSteps[newStep];
+      oldEl.classList.remove('active');
+      oldEl.classList.add(direction > 0 ? 'exit-left' : 'exit-right');
+      newEl.classList.add(direction > 0 ? 'enter-right' : 'enter-left');
+      newEl.style.transition = 'none';
+      newEl.offsetHeight;
+      newEl.style.transition = '';
+      newEl.classList.remove('enter-right','enter-left');
+      newEl.classList.add('active');
+      const cleanup = ()=>{ oldEl.classList.remove('exit-left','exit-right'); };
+      oldEl.addEventListener('transitionend', cleanup, {once:true});
+      setTimeout(cleanup, 500);
+    } else {
+      methSteps.forEach((s,i)=>{
+        s.classList.remove('active','exit-left','exit-right','enter-left','enter-right');
+        if(i === newStep) s.classList.add('active');
+      });
+    }
+
+    methDots.forEach((d,i)=>d.classList.toggle('active', i===newStep));
+  }
+
+  function methGoNext(){ setMethStep((methCurStep+1)%METH_TOTAL, 1); }
+  function methGoPrev(){ setMethStep((methCurStep-1+METH_TOTAL)%METH_TOTAL, -1); }
+
+  methPrev.addEventListener('click', methGoPrev);
+  methNext.addEventListener('click', methGoNext);
+
+  methDots.forEach((dot,i)=>{
+    dot.addEventListener('click',()=>{
+      const dir = i > methCurStep ? 1 : (i < methCurStep ? -1 : 0);
+      setMethStep(i, dir);
+    });
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const rect = document.getElementById('method').getBoundingClientRect();
+    const inView = rect.top < window.innerHeight * 0.7 && rect.bottom > window.innerHeight * 0.3;
+    if(!inView) return;
+    e.preventDefault();
+    if(e.key === 'ArrowLeft') methGoPrev();
+    if(e.key === 'ArrowRight') methGoNext();
+  });
+
+  let methTouchX = 0;
+  const methSec = document.getElementById('method');
+  methSec.addEventListener('touchstart', e=>{ methTouchX = e.touches[0].clientX; }, {passive:true});
+  methSec.addEventListener('touchend', e=>{
+    const dx = e.changedTouches[0].clientX - methTouchX;
+    if(Math.abs(dx) > 50){
+      if(dx > 0) methGoPrev(); else methGoNext();
+    }
+  });
+
+  let maxH = 0;
+  methSteps.forEach(s=>{
+    s.style.position = 'relative'; s.style.visibility = 'hidden'; s.style.display = 'block';
+    maxH = Math.max(maxH, s.offsetHeight);
+    s.style.position = ''; s.style.visibility = ''; s.style.display = '';
+  });
+  methTextArea.style.minHeight = maxH + 'px';
+  setMethStep(0, 0);
+
+  const methHintObs = new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){
+      methPrev.classList.add('hint');
+      methNext.classList.add('hint');
+      const remove = ()=>{ methPrev.classList.remove('hint'); methNext.classList.remove('hint'); };
+      methPrev.addEventListener('animationend', remove, {once:true});
+      methHintObs.disconnect();
+    }
+  },{threshold:0.3});
+  methHintObs.observe(methSec);
+
+  /* ── Scene selector + grid image ── */
+  const sceneGrid = document.getElementById('sceneGrid');
+  const baselineLbl = document.getElementById('baselineLbl');
+  const sceneBaseline = {1:'CIE XYZ Net',2:'Raw-Diffusion',3:'Raw-Diffusion',4:'CIE XYZ Net',5:'CIE XYZ Net'};
+  const expItems = document.querySelectorAll('.exp-item');
+  expItems.forEach(item => item.addEventListener('click', () => {
+    expItems.forEach(x => x.classList.remove('exp-on'));
+    item.classList.add('exp-on');
+    const n = item.dataset.scene;
+    sceneGrid.src = 'assets/images/comparison/allinone/' + n + '.webp';
+    if(baselineLbl) baselineLbl.textContent = sceneBaseline[n] || 'CIE XYZ Net';
+  }));
+
+  /* ── BibTeX copy ── */
+  document.getElementById('bibC').addEventListener('click',function(){
+    navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent).then(()=>{
+      this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000);
+    });
+  });
+
+  /* ── KaTeX ── */
+  function rk(){if(typeof renderMathInElement!=='undefined')renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})}
+  rk();setTimeout(rk,600);
+
+  /* ── Bar animation ── */
+  document.querySelectorAll('.bf').forEach(b=>{
+    const w=b.style.width;b.style.width='0%';
+    new IntersectionObserver(es=>{if(es[0].isIntersecting){setTimeout(()=>b.style.width=w,150)}},{threshold:.3}).observe(b);
+  });
+
+  /* ════ FOCUS → SHUTTER → CAPTURE SEQUENCE ════ */
+  const capFrame=document.getElementById('capFrame');
+  const capSrgb=document.getElementById('capSrgb');
+  const afGrid=document.getElementById('afGrid');
+  const afPts=document.querySelectorAll('.af-pt');
+  const capFlash=document.getElementById('capFlash');
+  const capDot=document.getElementById('capDot');
+  const capText=document.getElementById('capText');
+  let capVisible=false;
+
+  new IntersectionObserver(es=>{
+    if(es[0].isIntersecting&&!capVisible){capVisible=true;runCapture()}
+  },{threshold:.4}).observe(capFrame);
+
+  function runCapture(){
+    // ── Step 0: Reset to sRGB (fade back) ──
+    capFlash.classList.remove('shutter-go');
+    afGrid.style.opacity='0';
+    afPts.forEach(p=>p.classList.remove('on'));
+    capSrgb.classList.remove('captured'); // fade back 0.7s
+    capDot.className='cap-dot cap-dot-focus';
+    capText.textContent='Focusing...';capText.classList.remove('cap-text-done');
+
+    // Wait for sRGB fade-in to fully complete before starting AF
+    const fadeBackDone = 900; // 700ms fade + 200ms settle
+
+    // ── Step 1: AF hunting flicker ──
+    const flickerStart = fadeBackDone;
+    const flickerInterval = 55;
+    const flickerCycles = 2;
+
+    for(let i=0; i<flickerCycles; i++){
+      setTimeout(()=>{afGrid.style.opacity='1';afPts.forEach(p=>p.classList.add('on'))}, flickerStart + i*flickerInterval*2);
+      setTimeout(()=>{afPts.forEach(p=>p.classList.remove('on'))}, flickerStart + i*flickerInterval*2 + flickerInterval);
+    }
+
+    // ── Step 2: AF lock — solid ON ──
+    const lockTime = flickerStart + flickerCycles*flickerInterval*2 + 80;
+    setTimeout(()=>{
+      afGrid.style.opacity='1';
+      afPts.forEach(p=>p.classList.add('on'));
+      capDot.className='cap-dot cap-dot-done';
+      capText.textContent='Locked';capText.classList.add('cap-text-done');
+    }, lockTime);
+
+    // ── Step 3: Shutter → instant RAW ──
+    const shutterTime = lockTime + 800;
+    setTimeout(()=>{
+      capFlash.classList.add('shutter-go');
+      setTimeout(()=>{
+        afGrid.style.opacity='0';
+        capSrgb.classList.add('captured'); // instant 0s
+        capText.textContent='Captured';
+      },100);
+    }, shutterTime);
+
+    // ── Step 4: Hold RAW, then loop ──
+    const holdRaw = 3000;
+    setTimeout(()=>{
+      capVisible=false;
+      new IntersectionObserver(es=>{
+        if(es[0].isIntersecting&&!capVisible){capVisible=true;runCapture()}
+      },{threshold:.4}).observe(capFrame);
+    }, shutterTime + holdRaw);
+  }
+});
+</script>
+</body>
+</html>
