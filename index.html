@@ -880,13 +880,13 @@ Cameras capture scene-referred linear raw images, processed by ISPs into 8-bit s
 <div class="sc-ttl">Results Showcase</div>
 <div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:16px;margin-bottom:4px">
 <p class="sc-desc" style="margin-bottom:0">RawGen generates camera raw images from sRGB inputs or text prompts. Click to zoom.</p>
-<div class="mode-tog"><button class="mode-b on" data-mode="i2r">Image to Raw</button><button class="mode-b" data-mode="t2r">Text to Raw</button></div>
+<div class="mode-tog"><button class="mode-b on" data-mode="t2r">Text to Raw</button><button class="mode-b" data-mode="i2r">Image to Raw</button></div>
 </div>
 
-<!-- I2R Film Gallery -->
-<div class="film-gallery" id="film-i2r"></div>
 <!-- T2R Film Gallery -->
-<div class="film-gallery" id="film-t2r" style="visibility:hidden;position:absolute;height:0"></div>
+<div class="film-gallery" id="film-t2r"></div>
+<!-- I2R Film Gallery -->
+<div class="film-gallery" id="film-i2r" style="visibility:hidden;position:absolute;height:0"></div>
 </div></section>
 
 <!-- ════ CAMERA SELECTOR ════ -->
@@ -1571,7 +1571,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     '</div>';
   document.body.appendChild(lbEl);
 
-  let lbMode = 'i2r', lbIdx = 0, lbIllum = 0;
+  let lbMode = 't2r', lbIdx = 0, lbIllum = 0;
 
   function openLightbox(mode, idx) {
     lbMode = mode;
